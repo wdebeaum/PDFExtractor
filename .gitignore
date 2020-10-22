@@ -12,6 +12,7 @@ MANIFEST.MF
 /trips/src/config/defs.mk
 /trips/src/config/*/Makefile
 /trips/src/config/*/defs.mk
+/trips/src/config/java/ConfTest.java
 tabula-1.0.2-jar-with-dependencies.jar
 PDFExtractor
 .*.swp

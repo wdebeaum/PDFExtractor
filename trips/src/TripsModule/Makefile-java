@@ -9,9 +9,11 @@ PACKAGE = TRIPS.TripsModule
 
 SRCS = TripsModule.java \
 	StandardTripsModule.java \
-	GUITripsModule.java \
 	Sendable.java \
 	RunnableWithExceptions.java
+
+# GUITripsModule depends on TRIPS.util.GeometrySpec, which we don't have in git
+#	GUITripsModule.java \
 
 CLASSES = $(SRCS:.java=.class)
 

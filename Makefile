@@ -122,7 +122,16 @@ install:: $(TABULA_JAR)
 CONFIGDIR=trips/src/config
 include $(CONFIGDIR)/java/prog.mk
 
-# this rule added for standalone git version
+# the following two rules added for standalone git version
+# override TRIPS symlink in this dir to point to trips/src/ instead of ../
+# and make a symlink back up here
+TRIPS-stamp:: Makefile
+	rm -f TRIPS trips/src/PDFExtractor
+	ln -s trips/src/ TRIPS
+	(cd trips/src/ && ln -s ../../ PDFExtractor)
+	date >TRIPS-stamp
+
+# install/clean dependencies from TRIPS
 install clean::
 	cd trips/src/KQML && make $@
 	cd trips/src/TripsModule && make $@
