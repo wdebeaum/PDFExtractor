@@ -1,0 +1,31 @@
+# -*-mode: Makefile;-*-
+#
+# Makefile for TRIPS KQML library (in Perl)
+#
+# George Ferguson, ferguson@cs.rochester.edu,  6 Nov 1995
+# Time-stamp: <Thu May 30 17:35:15 CDT 2019 lgalescu>
+#
+
+MODULE = KQML
+SRCS = 	KQML.pm \
+	Lisp.pm
+
+PROGS = extract-messages
+
+CONFIGDIR=../config
+include $(CONFIGDIR)/perl/lib.mk
+
+# Extra for extract-messages utilities
+all:: $(PROGS)
+
+%-messages: %-messages.pl
+	sed -e 's@TRIPS_BASE_DEFAULT = .*$$@TRIPS_BASE_DEFAULT="$(prefix)";@' \
+	    $< >$@
+	chmod a+x $@
+
+install:: $(PROGS)
+	$(MKINSTALLDIRS) $(bindir)
+	$(INSTALL_PROGRAM) $(PROGS) $(bindir)
+
+clean::
+	rm -f $(PROGS)

@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PDFExtractor</title>
+<meta charset="UTF-8">
+<style type="text/css">
+table.ruled, table.ruled tr, table.ruled th, table.ruled td {
+  border: 1px solid black;
+  border-collapse: collapse;
+  padding: 1ex;
+}
+table.ruled th, table.ruled td {
+  vertical-align: top;
+  text-align: left;
+}
+code, code pre {
+  background-color: LightGray;
+}
+var {
+  background-color: SkyBlue;
+}
+table.intervals {
+  border-collapse: collapse;
+}
+.a {
+  background-color: #f77;
+}
+.b {
+  background-color: #77f;
+}
+td.a, td.b {
+  text-align: center;
+}
+.o {
+  background-color: #ccc;
+}
+tr.reln td {
+  border-top: 5px solid white;
+  border-bottom: 0px;
+}
+tr.inv td {
+  border-top: 0px;
+  border-bottom: 5px solid white;
+}
+</style>
+</head>
+<body>
+<h1>PDFExtractor</h1>
+William de Beaumont<br>
+$Date: 2020/04/10 20:43:17 $
+
+<h2>Introduction</h2>
+<p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
+
+<p>In this document, computer code is displayed like <code>this</code>, and variables like <code><var>this</var></code>. Optional parts are within square brackets <code>[ ]</code>, and alternatives are separated by pipes within curly braces <code>{ | | }</code>.</p>
+
+<h2>Installation</h2>
+<p>PDFExtractor can be installed in the usual way:</p>
+<code><pre>
+  make
+  make install
+</pre></code>
+<p>Among other things, <code>make</code> will download a jar file that includes both Tabula and PDFBox, so be sure to have a connection to the Internet before you run <code>make</code>.</p>
+
+<h2>Standalone/GUI usage</h2>
+<p>PDFExtractor has a graphical interface, and acts as a TRIPS module; most of its functions can be used either way. This section describes the graphical interface. You can start PDFExtractor in standalone mode, meaning it will only have the graphical interface, and won't act as a TRIPS module (it won't connect to the facilitator or stdin/stdout, and it won't accept KQML requests or generate KQML reports):</p>
+
+<code><pre>
+  <var>$TRIPS_BASE</var>/bin/PDFExtractor -standalone
+</pre></code>
+
+<h3>Document windows</h3>
+<p>In standalone mode, PDFExtractor will present a PDF file chooser on startup so that you can open the first PDF document, and after that you can use the <code>Open...</code> button in any document window to open other documents.</p>
+
+<p>Pressing the "Page Up", "Page Down", "Home", or "End" keys in a document window, or scrolling with the mouse wheel/trackpad, will change which page of the document is displayed. You can also change the page by entering the (1-based) page number in the field labeled <code>Page:</code>.</p>
+
+<p>Dragging the left mouse button will select a rectangular region of the currently displayed page. Dragging the left mouse button starting near the edge or corner of an existing highlighted region will instead move that edge or corner. If you change an existing region so that its opposite edges are the same, it will deselect the region. If you do this when first selecting a region, the selection will be cancelled.</p>
+
+<p>Instead of manually selecting table regions, you can also ask Tabula to do it for you by clicking the <code>Detect Table</code> button.</p>
+
+<p>Clicking the <code>Parse Table</code> button in the document window will parse the region last selected on the current page as a table, and then display the table in a new window.</p>
+
+<h3>Table windows</h3>
+
+<p>A table window contains a spreadsheet-like display of the data in the table. You can select rectangular regions of cells by dragging the mouse across them. You can also select whole rows or columns (or ranges thereof) by clicking on (or dragging across) the gray row or column headings.</p>
+
+<p>This window also has a toolbar along the top, with buttons you can click on to save or edit the table. Different editing buttons may be visible depending on what is currently selected. The following table lists all the buttons that may appear in this toolbar:</p>
+
+<table class="ruled">
+<tr><th>Button</th><th>Description</th><th>Appears when...</th><th>KQML</th></tr>
+<tr><td><code>Save csv...</code></td><td>Saves the table data as a Comma-Separated Values (<code>.csv</code>) file (after you choose the file to save to in the file chooser window it opens). Individually-merged cells put their data in their top-left cell, and superscripts and edited cell properties are not preserved.</td><td>always</td><td><code>save-table</code></td></tr>
+<tr><td><code>Save html...</code></td><td>Saves the table data as an HTML <code>&lt;table&gt;</code>. Unlike the CSV format, this will preserve individually-merged cells (using <code>rowspan</code>/<code>colspan</code>), superscripts, and edited cell properties.</td><td>always</td><td><code>save-table</code></td></tr>
+<tr><td><code>Undo</code></td><td>Moves backward in the edit history.</td><td>some edits have been done</td><td><code>undo</code></td></tr>
+<tr><td><code>Redo</code></td><td>Moves forward in the edit history.</td><td>some edits remain undone, and no new edits have taken their place in the edit history</td><td><code>redo</code></td></tr>
+<tr><td><code>Auto-Split Columns</code></td><td>Attempts to split columns (as if by multiple <code>Split Column at X=<var>x</var></code> edits) automatically, and then re-merge some of the cells in those columns (as if by multiple <code>Merge Cells</code> edits), based on (partial) vertical ruling lines in the original document.</td><td>auto-split has not yet been done</td><td><code>auto-split-columns</code></td></tr>
+<tr><td><code>Auto-Merge Cells</code></td><td>Attempts to merge cells (as if by multiple <code>Merge Cells</code> edits) automatically, based on ruling lines and spacing in the original document.</td><td>auto-merge has not yet been done</td><td><code>auto-merge-cells</code></td></tr>
+<tr><td><code>Delete Rows</code></td><td>Deletes the selected rows.</td><td>some whole rows are selected<a href="#nm">*</a></td><td><code>delete-rows</code></td></tr>
+<tr><td><code>Delete Columns</code></td><td>Deletes the selected columns.</td><td>some whole columns are selected<a href="#nm">*</a></td><td><code>delete-columns</code></td></tr>
+<tr><td><code>Merge Rows</code></td><td>Replaces the selected rows with a single row. In the new cells, the old rows will be separated by newlines.</td><td>multiple whole rows are selected<a href="#nm">*</a></td><td><code>merge-rows</code></td></tr>
+<tr><td><code>Merge Columns</code></td><td>Replaces the selected columns with a single column. In the new cells, the old columns will be separated by spaces where the amount of space in the original document warrants it.</td><td>multiple whole columns are selected<a href="#nm">*</a></td><td><code>merge-columns</code></td></tr>
+<tr><td><code>Merge Cells</code></td><td>Replace the selected cells with a single, individually-merged cell, while leaving the rest of the cells in the same rows or same columns separate.</td><td>multiple cells are selected<a href="#nm">*</a></td><td><code>merge-cells</code></td></tr>
+<tr><td><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
+<tr><td><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels).</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
+<tr><td><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
+<tr><td><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
+</table>
+<p><a name="nm">*</a> and the selection touches no individually-merged cells</p>
+
+<p>You can undo the edit you just made by clicking the <code>Undo</code> button, and you can redo the edit you just undid by clicking the <code>Redo</code> button. Clicking either of these buttons multiple times will move you further backward or forward in the edit history. Note that you can't undo an edit, make a new edit, and then redo the edit you undid, because the new edit puts you on a different timeline. Also note that in the edit history, clicking <code>Auto-Merge Cells</code> once counts as clicking <code>Merge Cells</code> multiple times, once for each merger. Similarly, clicking <code>Auto-Split Columns</code> once counts as multiple <code>Split Column at X=<var>x</var></code> clicks followed by multiple <code>Merge Cells</code> clicks. So for these <code>Auto-<var>*</var></code> edits, you may need to click <code>Undo</code> multiple times to fully undo them.</p>
+
+<p>Note that since many edits will not work if the selection touches any individually-merged cells (which are created with (<code>Auto-</code>)<code>Merge Cells</code>), it's best to do such merging last.</p>
+
+<p>Whenever cells are merged (with any of the <code>Merge <var>...</var></code> buttons), PDFExtractor tries to preserve the original spacing and line breaks from the document, no matter the order of operations. For example, given an initial table like this:</p>
+
+<table>
+<tr><td></td><th><code>A</code></th><th><code>B</code></th></tr>
+<tr><th><code>1</code></th><td>foo</td><td>bar</td></tr>
+<tr><th><code>2</code></th><td colspan="2">bazquux</td></tr>
+</table>
+
+<p>you could merge columns A and B. Merging cells A1 and B1 would yield "foo bar" (with a space), while merging cells A2 and B2 would yield "bazquux" (no space). Then, merging rows 1 and 2 would yield a cell with two lines, "foo bar" and "bazquux". You would get the same result if you instead merged rows 1 and 2 first, and then merged columns A and B second.</p>
+
+<h3>Splitting columns</h3>
+
+<p>Sometimes Tabula will put data that should be in multiple columns instead into a single column. In order to split such columns, you must provide it a vertical line to form the new column boundary, identified by its X coordinate in pixels. This is different from most other edits, which deal with selections of table cells, not pixels, so it warrants further explanation. The table window is where you deal in table cells, while the document window is where you deal in pixels.</p>
+
+<p>To split a column, switch from the table window back to the document window, on the page the table came from, and select a region whose left edge is the new column boundary you want. Then switch back to the table window, where a new <code>Split column at X=<var>x</var></code> button should have appeared (<var>x</var> is the X coordinate of the left edge of the region you just selected). If you click this button, the column that the new boundary is in will be split on that boundary.</p>
+
+<p>Usually in this situation, some of the cells (e.g. shared headings) should not be split. Use the <code>Merge Cells</code> or <code>Auto-Merge Cells</code> buttons to merge those cells again after splitting the column.</p>
+
+<p>If the original table has vertical ruling lines separating the columns, you can use the <code>Auto-Split Columns</code> button to do both steps (splitting columns and re-merging cells) for the whole table at once. Usually Tabula handles such ruled tables well, but it still fails to split columns when there is a single column heading spanning them; <code>Auto-Split Columns</code> helps with that case.</p>
+
+<p>If the table has no vertical ruling lines, <code>Auto-Split Columns</code> should do nothing. However, it is possible that the PDF will appear to Tabula to have ruling lines that aren't actually visible as such when the page is finally displayed. In that case, <code>Auto-Split Columns</code> and <code>Auto-Merge Cells</code> (which also uses vertical and horizontal ruling lines) may appear to do strange things. Remember you may need to <code>Undo</code> multiple times to fully undo these <code>Auto-<var>*</var></code> edits.</p>
+
+<h3>Multi-page tables</h3>
+
+<p>Sometimes a table will span multiple pages in the document. In that case, you should get a separate table from each page, and make sure they all end up with the same number of columns. After each page, starting with the second, you can go back to the table from the first page, and use the <code>Append rows of <var>table-ID</var></code> button to add the rows from the page you just did to the end of the table from the first page. The <var>table-ID</var> appears in the title of the table window, so you can tell which button to push if you have three or more table windows open.</p>
+
+<p>From the second page on, you may wish to omit the headings from the table, which are usually repeated for each page. You can do this one of two ways. One way is to manually select the table region in the document window so that it excludes the headings (the automatic <code>Detect Table</code> button will usually include the headings). Another way is to delete the heading rows from the table window, using the <code>Delete Rows</code> button. The first way has the advantage of avoiding the problem of certain spanning headings preventing Tabula from detecting column boundaries under them, so you don't need to split columns as much. When that problem doesn't exist, the second way is slightly easier.</p>
+
+<h3>Editing cell properties</h3>
+
+<p>You might want to edit the content of a cell, mark it as a heading for other cells, or add other arbitrary annotations. To do this, select the cell and click the <code>Edit Cell</code> button. A window will appear with the following fields:</p>
+<dl>
+ <dt><code>Original content</code>
+  <dd>The content of the cell as extracted from the document (not editable).
+ <dt><code>Edited content</code>
+  <dd>The content you wish the cell to have.
+ <dt><code>Annotations</code>
+  <dd>Arbitrary text you wish to associate with the cell but separately from the actual content of the cell. This will appear in the tooltip. If you include the substrings <code>[cell]</code>, <code>[row heading]</code>, and/or <code>[column heading]</code> in the annotations, they will be replaced in the tooltip with the contents of the cell, its row heading, and/or its column heading, respectively. If there are multiple row headings or column headings for a cell, only the first heading of each type will be used, according to normal reading order (top to bottom, left to right).
+ <dt><code>Cell type</code>
+  <dd>The type of cell this is: <code>data</code>, <code>row heading</code>, or <code>column heading</code>. By default, a row heading applies to the cells in its row(s) that are to its right, and a column heading applies to the cells in its column(s) that are below it.
+ <dt><code>Heading for cells</code>
+  <dd>The rectangular region of cells that this heading applies to, specified by the top left and bottom right corner coordinates, e.g. <code>B3-C45</code>. For <code>data</code> cells, this is <code>N/A</code>. When you change the cell type, this field will automatically be filled with a default value, but you can change it afterward. The default value depends on the type and the position of the cell in the table. Heading cells will have the type and this field in the tooltip, after any other annotations, e.g. <code>column heading for B3-C45</code>.
+</dl>
+
+<p>You can also edit multiple cells at once, by selecting all of them and clicking the <code>Edit Cells</code> button. A similar window will appear, but it will only have the <code>Annotations</code> and <code>Cell type</code> fields. The contents of the cells won't change, and the <code>Heading for cells</code> field will use its default value for the type and the position of the cell in the table. If the default isn't what you want, you can edit each cell individually. For example, you could select the top few rows of a table, click <code>Edit Cells</code> and set their type to <code>column heading</code>. Then you could close that window, select one of the column headings, click <code>Edit Cell</code>, and change its <code>Heading for cells</code> field.</p>
+
+<h3>Extended example</h3>
+
+<p>Here is an extended example of how to use many of the features of PDFExtractor using the graphical interface.</p>
+
+<ul>
+ <li>Getting and opening the document.
+  <ul>
+   <li>Download <a href="http://www.swvt.uga.edu/2017/SYSR17/AP103-9-Final.pdf">this PDF file</a>.
+   <li>Start PDFExtractor in standalone mode: <code><var>$TRIPS_BASE</var>/bin/PDFExtractor -standalone</code>
+   <li>Choose the file you downloaded in the file chooser.
+   <li>A document window appears showing the first page of the file.
+  </ul>
+ <li>First page of the table.
+  <ul>
+   <li>Enter 19 in the <code>Page:</code> field to go to page 19, where there is a table.</li>
+   <li>Click on the <code>Detect Table</code> button in the top right.
+   <li>A colored rectangle appears, highlighting the region automatically detected to be the table.
+   <li>Click on the <code>Parse Table</code> button (which has taken the place of the <code>Detect Table</code> button).
+   <li>A table window appears showing an imperfect interpretation of the table. In particular, column G really should be two columns, and rows 2 and 3 really should be one row, and it would be nice to merge some other cells.
+   <li>Switch back to the document window.
+   <li>Drag the mouse from somewhere in the second half of where column G came from (the "Lodg.<sup>2</sup>" column) to the vertical boundary between that column and the previous one ("Plant Ht"), so that you select a rectangular region whose left edge is on that boundary.
+   <li>Switch back to the table window.
+   <li>Click on the <code>Split column at X=429.0</code> button (the number may be a little different).
+   <li>Now column G gets split into new columns G and H. Row 1 gets split unpleasantly, but we'll take care of that later.
+   <li>Drag the mouse from row 2 to row 3 along the gray headings on the left in order to select rows 2 and 3.
+   <li>Click the <code>Merge Rows</code> button that appears, to merge the selected rows.
+   <li>Click the <code>Auto-Merge Cells</code> button to take care of that split "2017 Data" and merge it according to the ruling line under it in the original document.
+   <li>Drag the mouse from cell C1 to cell C2 to select those cells.
+   <li>Click the <code>Merge Cells</code> button that appears, to merge the selected cells individually, and make a single cell "2-Year Average Yield". (You can do the same thing in columns A and B if you like.)
+  </ul>
+ <li>Second page of the table.
+  <ul>
+   <li>Go back to the document window and press the "Page Down" key (Fn+down arrow on a MacBook) to go to the next page, where the table continues.
+   <li>Drag the mouse from the top left (excluding the headings) i.e. "Terral Seed", to the bottom right i.e. "0.03", selecting the table data region manually.
+   <li>Click the <code>Parse Table</code> button.
+   <li>A second table window appears; this one is <code>table96</code>; the one for the first page is <code>table93</code> (your IDs may vary).
+   <li>Again, this new table is imperfect. It only has columns A-I, but we need A-J in order to append it to <code>table93</code>. The problem is that column A really should be two columns, with a few merged cells.
+   <li>Switch back to the document window, and drag the mouse from the "Variety" column to the boundary between it and the previous "Company or Brand Name" column, selecting a rectangular region whose left edge is that boundary.
+   <li>Switch back to the <code>table96</code> window, and click the <code>Split column at X=146.0</code> button (your X may vary). You might need to resize the window in order to see the whole button.
+   <li>Click the <code>Auto-Merge Cells</code> button to take care of the cells from the new column A that spill over into the new column B.
+  </ul>
+ <li>Merging tables and saving.
+  <ul>
+   <li>Switch to the other table window, the one from the first page, <code>table93</code>.
+   <li>Click the <code>Append rows of table96</code> button (which is there now because the two tables have the same number of columns) to add the rows from the second page.
+   <li>Click the <code>Save html...</code> button.
+   <li>Choose a file to save to in the file chooser window that appears.
+   <li>Open that file in your web browser of choice, and see the table you extracted!
+  </ul>
+</ul>
+
+
+<h2>TRIPS module usage</h2>
+<p>This section describes the KQML (TRIPS module) interface, and how it relates to the GUI. Run PDFExtractor like any other TRIPS module:</p>
+<code><pre>
+  <var>$TRIPS_BASE</var>/bin/PDFExtractor [ -connect { <var>host</var>:<var>port</var> | no } ]
+</pre></code>
+
+<p>Or, since it runs on the JVM, you may start it by sending a KQML message to the Facilitator like this:</p>
+<code><pre>
+  (request
+    :receiver Facilitator
+    :content (start-module
+               :name pdfextractor
+	       :class TRIPS.PDFExtractor.PDFExtractor
+	       :urlclasspath ("<var>$TRIPS_BASE</var>/etc/java/TRIPS.PDFExtractor.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/TRIPS.TripsModule.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/TRIPS.KQML.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/TRIPS.util.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/TRIPS.util.cwc.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/TRIPS.ChartDisplay.jar"
+                              "<var>$TRIPS_BASE</var>/etc/java/tabula-1.0.2-jar-with-dependencies.jar"
+			      )
+               :argv ( [ "-connect" "<var>host</var>:<var>port</var>" ] )
+               )
+    )
+</pre></code>
+
+<p>When PDFExtractor is not run in standalone mode, it will not open any windows on startup. To open the first PDF document, you should send it a <code>display</code> request.</p>
+
+<h3>The <code>display</code> request</h3>
+<code><pre>
+  (request :content (display
+    :file { choose | (file :name "<var>filename.pdf</var>") }
+    [ :page <var>page-index</var> ]
+    [ <var>window-config...</var> ]
+    ))
+</pre></code>
+
+<p>This will load <var>filename.pdf</var> as a PDF document and display it in a new window, starting on the indexed page (default <code>:page 0</code>). If the <code>:file</code> argument is <code>choose</code>, it will put up a file chooser dialog to let the user choose the PDF file to load. It will also generate two reports: one that the window <code>opened</code> (see Window Management), and another saying which page is displayed in it:</p>
+
+<code><pre>
+  (tell :content (report :content (displayed
+    :what
+      (page
+	:id <var>page-ID</var>
+	:document <var>document-ID</var>
+	:index <var>page-index</var>
+	:bounds (rectangle :x <var>min-x</var> :y <var>min-y</var> :w <var>width</var> :h <var>height</var>))
+    :where <var>window-ID</var>
+    )))
+</pre></code>
+
+<p>If the user cancels the file chooser dialog, it will instead generate a report like this:</p>
+
+<code><pre>
+  (tell :content (report :content (failure
+    :type cannot-perform
+    :reason (cancelled)
+    )))
+</pre></code>
+
+<p>When the page being displayed changes (e.g. when the user presses the "Page Down" key), another <code>displayed</code> report will be sent.</p>
+
+<p>Note that while the <var>page-ID</var> will have a number in it, this number is not the <var>page-index</var> or any other kind of page number. It's just a serial number for the ID. Also note that the <var>page-index</var> is 0-based, so it will be one less than the page number displayed in the "Page:" field.</p>
+
+<p>Selecting a rectangular region results in a report like this:</p>
+<code><pre>
+  (tell :content (report :content (selected :what
+    (rectangle :id <var>region-id</var> :page <var>page-desc</var> :x <var>min-x</var> :y <var>min-y</var> :w <var>width</var> :h <var>height</var>)
+    )))
+</pre></code>
+
+<p>Moving an edge or corner of an existing region will result in a similar report with the verb <code>changed</code> instead of <code>selected</code>. Deselecting a region will result in a <code>deselected</code> report instead of <code>changed</code>. No report will be sent for cancelled selections.</p>
+
+<p>Clicking anywhere on the page without dragging will result in a <code>clicked</code> report, which includes the pixel coordinates of the click on the page, as well as descriptions of any highlighted regions that contain the clicked point:</p>
+
+<code><pre>
+  (tell :content (report :content (clicked
+    :x <var>x</var> :y <var>y</var>
+    :page <var>page-id</var>
+    :regions (<var>rect1</var> <var>rect2</var> ...)
+    )))
+</pre></code>
+
+<p>If the document is already being displayed, the <code>display</code> request will instead just set which page is being displayed and the configuration of the window the document is being displayed in. (You can also use the <code>configure</code> request for the latter function.)</p>
+
+<h3>The <code>detect-table-regions</code> request</h3>
+
+<p>Instead of manually selecting regions, you can also ask Tabula to do it for you using a request like this:</p>
+
+<code><pre>
+  (request :content (detect-table-regions { :page <var>page-id</var> | :region <var>region-id</var> } ))
+</pre></code>
+
+<p>Which will get a reply like this, with zero or more <code>rectangle</code> structures in the same format as in the <code>selected</code> report above:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :regions (<var>rect1</var> <var>rect2</var> ...))))
+</pre></code>
+
+<p>If you click the <code>Detect Table</code> button, you'll get a similar report:</p>
+
+<code><pre>
+  (tell :content (report :content (detected-table-regions :page <var>page-id</var> :regions (<var>rect1</var> <var>rect2</var> ...))))
+</pre></code>
+
+<p>Note that the request also allows you to specify a region on a page instead of the whole page. In that case, any detected tables will be contained in that region.</p>
+
+<h3>The <code>parse-table</code> request</h3>
+<code><pre>
+  (request :content (parse-table :region <var>region-id</var>))
+</pre></code>
+
+<p>This will call Tabula on a previously-selected region identified by its <var>region-id</var>. Selecting a table that looks like this and calling <code>parse-table</code> on it:</p>
+
+<table>
+<tr><td><var>0,0</var></td><td><var>0,1</var></td><td><var>0,2</var></td></tr>
+<tr><td><var>1,0</var></td><td><var>1,1</var></td><td><var>1,2</var></td></tr>
+<tr><td><var>2,0</var></td><td><var>2,1</var></td><td><var>2,2</var></td></tr>
+<tr><td><var>3,0</var></td><td><var>3,1</var></td><td><var>3,2</var></td></tr>
+</table>
+
+<p>should result in a reply like this:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :table
+    (table :id <var>table-id</var> :data (
+      ("<var>0,0</var>" "<var>0,1</var>" "<var>0,2</var>")
+      ("<var>1,0</var>" "<var>1,1</var>" "<var>1,2</var>")
+      ("<var>2,0</var>" "<var>2,1</var>" "<var>2,2</var>")
+      ("<var>3,0</var>" "<var>3,1</var>" "<var>3,2</var>")
+      )
+      :rulings ()
+    ))))
+</pre></code>
+
+<p>Note that the <var>table-id</var> is distinct from the <var>region-id</var>.</p>
+
+<p>If you click the <code>Parse Table</code> button, you'll get a similar report:</p>
+
+<code><pre>
+  (tell :content (report :content (parsed-table :table (table <var>...</var>))))
+</pre></code>
+
+<p>If there are any horizontal or vertical lines drawn in the table that span multiple columns or rows (resp.), but not a whole row or column, they will be reported in the <code>:rulings</code> list, with coordinates in terms of the rows and columns of the table, e.g.:</p>
+
+<code><pre>
+    :rulings (
+      (horizontal :row 0 :first-column 3 :last-column 9)
+      (horizontal :row 4 :first-column 0 :last-column 1)
+    )
+</pre></code>
+
+<p>Note that the <code>parse-table</code> request only parses the table, it doesn't display it like the <code>Parse Table</code> button does. If you want to display the table, you must also send the <code>display-table</code> request.</p>
+
+<h3>The <code>display-table</code> request</h3>
+<code><pre>
+  (request :content (display-table
+    :table <var>table-id</var>
+    [ <var>window-config...</var> ]
+    ))
+</pre></code>
+
+<p>This will create a new table window displaying the table identified by its <var>table-id</var>. Like <code>display</code>, this generates two reports: one that the window <code>opened</code>, and another that the table was <code>displayed</code> in it. These reports are also generated if you press the <code>Parse Table</code> button.</p>
+
+<code><pre>
+  (tell :content (report :content (displayed :what <var>table-id</var> :where <var>window-id</var>)))
+</pre></code>
+
+<p>Selecting cells in this display will result in a report like this:</p>
+
+<code><pre>
+  (tell :content (report :content (selected :what <var>selection</var>)))
+</pre></code>
+
+<p>Where selection is one of the following, depending on whether whole rows or columns were selected, and whether more than one was selected:</p>
+<ul>
+ <li><code>(row :table <var>table-id</var> :index <var>row-index</var>)</code>
+ <li><code>(column :table <var>table-id</var> :index <var>column-index</var>)</code>
+ <li><code>(cell :table <var>table-id</var> :row <var>row-index</var> :column <var>column-index</var>)</code>
+ <li><code>(rows :table <var>table-id</var> :first <var>first-row-index</var> :last <var>last-row-index</var>)</code>
+ <li><code>(columns :table <var>table-id</var> :first <var>first-column-index</var> :last <var>last-column-index</var>)</code>
+ <li><code>(cells :table <var>table-id</var> :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var>)</code>
+</ul>
+
+<p>You can also make a new table to display by giving a description of the table (in a similar format to that returned by <code>parse-table</code>) instead of the ID of an existing table:</p>
+
+<code><pre>
+  (request :content (display-table :table
+    (table :data (
+      ("<var>0,0</var>" "<var>0,1</var>" "<var>0,2</var>")
+      ("<var>1,0</var>" "<var>1,1</var>" "<var>1,2</var>")
+      ("<var>2,0</var>" "<var>2,1</var>" "<var>2,2</var>")
+      ("<var>3,0</var>" "<var>3,1</var>" "<var>3,2</var>")
+      ))))
+</pre></code>
+
+<p>Note that you should not supply <code>:id</code> in this case (that will just look up an existing table), and <code>:rulings</code> currently does nothing.</p>
+
+<h3>The <code>select</code> and <code>deselect</code> requests</h3>
+<code><pre>
+  (request :content ({ select | deselect } :what <var>region</var>))
+</pre></code>
+
+<p>This will select or deselect the table cells or page region (rectangle) described by <var>region</var>. For table cells, any of the <var>selection</var> types listed above for <code>selected</code> reports will work. For example, for a table row, specify the <var>table-id</var> and <var>row-index</var> like this:</p>
+
+<code><pre>
+  (request :content (select :what
+    (row :table <var>table-id</var> :index <var>row-index</var>)))
+</pre></code>
+
+<p>Note that <code>deselect</code>ing some table cells may also cause others to be deselected, since only single rectangular selections are allowed.</p>
+
+<p>For a page region, either specify everything necessary to create a new rectangle:</p>
+
+<code><pre>
+  (request :content (select :what
+    (rectangle
+      :page <var>page</var>
+      :x <var>min-x</var> :y <var>min-y</var>
+      :w <var>width</var> :h <var>height</var>)))
+</pre></code>
+
+<p>(where <var>page</var> is either an ID or a structure like <code>(page :document <var>document-id</var> :index <var>page-index</var>)</code>)</p>
+
+<p>Or specify a rectangle by its ID (but still in a <code>rectangle</code> structure so we know the type):</p>
+
+<code><pre>
+  (request :content (select :what (rectangle :id <var>region-id</var>)))
+</pre></code>
+
+<p>You can also specify all the rectangles on a particular page with plural <code>rectangles</code> like this:</p>
+
+<code><pre>
+  (request :content (deselect :what (rectangles :page <var>page</var>)))
+</pre></code>
+
+<h3>The <code>edit-table</code> request</h3>
+<code><pre>
+  (request :content (edit-table :table <var>table-ID</var> :edit <var>edit-description</var>))
+</pre></code>
+
+<p>This will edit the table identified by the <var>table-ID</var> according to the <var>edit-description</var>, which may be any of the following:</p>
+
+<dl>
+ <dt><code>(merge-tables :others (<var>other-table-ID-1</var> <var>other-table-ID-2</var> ...))</code>
+  <dd>Add all the rows from the other tables to the end of this table. All tables must have the same number of columns.
+ <dt><code>(delete-rows :first <var>first-row-index</var> :last <var>last-row-index</var>)</code>
+  <dd>Delete a contiguous group of rows, indexed from <var>first-row-index</var> up to and including <var>last-row-index</var>.
+ <dt><code>(delete-columns :first <var>first-column-index</var> :last <var>last-column-index</var>)</code>
+  <dd>Ditto for columns.
+ <dt><code>(merge-rows :first <var>first-row-index</var> :last <var>last-row-index</var>)</code>
+  <dd>Replace a contiguous group of rows with a single row. In the new cells, the old rows will be separated by newlines.
+ <dt><code>(merge-columns :first <var>first-column-index</var> :last <var>last-column-index</var>)</code>
+  <dd>Replace a contiguous group of columns with a single column. In the new cells, the old columns may be separated by spaces.
+ <dt><code>(merge-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var>)</code>
+  <dd>Replace a rectangular region of cells with a single merged cell, while leaving the rest of the cells in the same rows or same columns separate. In the reported table data this has the effect of moving the contents of all the cells in the region into the top-left cell in the region, leaving the rest empty but still present. Note that most other subsequent edits will fail if they touch such individually-merged cells, since it's not clear what should happen to them. So it's best to do any <code>merge-cells</code> edits last.
+ <dt><code>(select-and-reorder-rows :rows (<var>row-index-1</var> <var>row-index-2</var> ...))</code>
+  <dd>Select only specific rows to remain in the table, and put them in the order they appear in <code>:rows</code>.
+ <dt><code>(select-and-reorder-columns :columns (<var>column-index-1</var> <var>column-index-2</var> ...))</code>
+  <dd>Ditto for columns.
+ <dt><code>(split-column :at-x <var>x</var>)</code>
+  <dd>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels). Note that there is no <code>split-row</code>; the rows Tabula generates initially will always be a single line of text, so if you want them split, just don't merge them in the first place.
+ <dt><code>(edit-cell :row <var>row-index</var> :column <var>column-index</var> [ :content "<var>new-content</var>" ] [ :annotations "<var>new-annotations</var>" ] [ :type <var>new-type</var> ] [ :heading-for "<var>new-region</var>" ] )</code>
+  <dd>Edit the properties of the cell at (<var>row-index</var>, <var>column-index</var>), replacing the values of any specified fields with the specified values, and replacing the values of the other fields with default values. Note that <var>new-type</var> should be a symbol (not a string), one of <code>data</code>, <code>row-heading</code>, or <code>column-heading</code>. Also note that <code>:heading-for</code> takes a string in the same format as the <code>Heading for cells</code> field in the GUI, e.g. <code>"B3-C45"</code>. The default <code>:content</code> is the original cell content from the document. The other defaults are <code>:annotations "" :type data :heading-for "N/A"</code>. But if <code>:type</code> is specified, <code>:heading-for</code> will default to an appropriate value for that type and the position of the cell in the table.
+ <dt><code>(edit-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var><br> [ :annotations "<var>new-annotations</var>" ] [ :type <var>new-type</var> ])</code>
+  <dd>Edit some of the properties of all of the cells in the specified rectangular region. Note that unlike <code>edit-cell</code>, this won't accept <code>:content</code> or <code>:heading-for</code> arguments.
+ <dt><code>(undo)</code>
+  <dd>Moves backward in the edit history.
+ <dt><code>(redo)</code>
+  <dd>Moves forward in the edit history.
+</dl>
+
+<p>The reply to <code>edit-table</code> request is in almost the same format as for the <code>parse-table</code> request, and includes the <code>:data</code> for the table after the edit was applied. It also includes an <code>:edit</code> argument which is the actual edit that was applied.</p>
+
+<p>Many of these edits can be performed from the GUI by selecting some cells and clicking the corresponding button in the toolbar at the top of the table window. These will show up as buttons when the current selection allows them, e.g. select two or more columns with no individually-merged cells in them in order to make the <code>Merge Columns</code> button appear. Some edits depend on other factors; <code>merge-tables</code> appears as <code>Append rows of <var>table-ID</var></code> when <var>table-ID</var> has the same number of columns, and <code>split-column</code> appears as <code>Split column at X=<var>x</var></code> when a rectangle is selected whose minimum <var>x</var> coordinate could be used to divide a column. The <code>select-and-reorder-rows</code>/<code>columns</code> edits can't be done from the GUI.</p>
+
+<p>When you perform an edit from the GUI, it will be reported like this:</p>
+
+<code><pre>
+  (tell :content (report :content (edited-table :table <var>table-ID</var> :edit <var>edit-description</var>)))
+</pre></code>
+
+<p>Redos will be reported as the edit that was redone, not as <code>(redo)</code> itself. Undos will be reported as <code>(undo <var>edit</var>)</code>, where <var>edit</var> is the edit that was undone. The same applies to the <code>:edit</code> argument of the answer to the <code>edit-table</code> request.</p>
+
+<h3>The <code>auto-split-columns</code> request</h3>
+
+<code><pre>
+  (request :content (auto-split-columns :table <var>table-ID</var>))
+</pre></code>
+
+<p>This will attempt to automatically detect and perform <code>split-column</code> edits, and then <code>merge-cells</code> edits for some of the cells that were split, on the given table. A vertical ruling that could split half of the cells in a column (or more) is used to split the column, and the cells that don't have a vertical ruling going through them at the same X coordinate are later re-merged.</p>
+
+<p>The reply to <code>auto-split-columns</code> is like those of <code>parse-table</code> and <code>edit-table</code>, except with an <code>:edits</code> argument (instead of <code>:edit</code>) listing the <code>split-column</code> and <code>merge-cells</code> edits that were performed, in order:</p>
+
+<code><pre>
+  (reply :content (report :content (answer
+    :table <var>table-description</var>
+    :edits (
+      (split-column <var>...</var>)
+      <var>...</var>
+      (merge-cells <var>...</var>)
+      <var>...</var>
+      )
+    )))
+</pre></code>
+
+<p>There is a corresponding <code>Auto-Split Columns</code> button in the toolbar. Clicking it has the same effect as the <code>auto-split-columns</code> request, except that instead of sending the edits in a reply message, they are sent in individual <code>edited-table</code> reports, as if the user had done each one manually. Also note that for the purposes of undo/redo, these edits are treated individually, so undoing or redoing a single click of this button may require multiple clicks of the <code>Undo</code> or <code>Redo</code> button.</p>
+
+<h3>The <code>auto-merge-cells</code> request</h3>
+
+<code><pre>
+  (request :content (auto-merge-cells :table <var>table-ID</var>))
+</pre></code>
+
+<p>This will attempt to automatically detect and perform <code>merge-cells</code> edits on the given table. Groups of cells with a (horizontal or vertical) ruling going through them will be merged. And horizontal groups of cells separated by the width of a space or less will be merged. Any such <code>merge-cells</code> edits that fail for whatever reason will be ignored, and the cells will remain separate.</p>
+
+<p>Like manual <code>merge-cells</code> edits, it's recommended to do <code>auto-merge-cells</code> last, to avoid interfering with later edits.</p>
+
+<p>The reply to <code>auto-merge-cells</code> is similar to that of <code>auto-split-columns</code>, but with only <code>merge-cells</code> edits.</p>
+
+<p>There is a corresponding <code>Auto-Merge Cells</code> button in the toolbar. It has a similar relationship to the <code>auto-merge-cells</code> request as that between the <code>Auto-Split Columns</code> button and <code>auto-split-columns</code> request.</p>
+
+<h3>The <code>save-table</code> request</h3>
+
+<code><pre>
+  (request :content (save-table :table <var>table-ID</var> [ :file <var>file-description</var> ]))
+</pre></code>
+
+<p>This will save the table identified by the <var>table-ID</var> to the file described by <var>file-description</var>, which may be any of the following:</p>
+
+<dl>
+ <dt><code>(file :name "<var>filename</var>" [ :format { "text/csv" | "text/html" } ])</code>
+  <dd>A structure describing the file. If <code>:format</code> is <code>"text/csv"</code>, the table will be written as a comma-separated-values (CSV) file. If <code>:format</code> is <code>"text/html"</code>, the table will be written as an HTML file with a <code>&lt;table&gt;</code> element in it. The HTML format preserves more formatting information (cell spans, superscripts, and edited cell properties). The default is <code>:format "text/csv"</code>.
+ <dt><code>"<var>filename</var>"</code>
+  <dd>Just the filename in a string. The format will be assumed to be CSV unless the filename ends with <code>.html</code>, in which case it will be assumed to be HTML.
+ <dt><code>choose</code>
+  <dd>A file chooser dialog will be displayed to let the user choose a file to save to. The format will be determined in the same way as for <code>"<var>filename</var>"</code> above.
+ <dt>no <code>:file</code> argument
+  <dd>A filename will be constructed by appending <code>.csv</code> to the <var>table-ID</var>.
+</dl>
+
+<p>Once the file is saved, you will receive a reply like this:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :file
+    (file :name "<var>filename</var>" :format "<var>format</var>")
+    )))
+</pre></code>
+
+<p>The full <code>file</code> structure will be included regardless of how or whether you supplied the <var>file-description</var> in the request.</p>
+
+<p>If you instead use one of the <code>Save...</code> buttons to save a table, a report like this will be generated:</p>
+
+<code><pre>
+  (tell :content (report :content
+    (saved :what <var>table-ID</var>
+	   :where (file :name "<var>filename</var>" :format "<var>format</var>"))))
+</pre></code>
+
+<h3>The <code>get-history</code> request</h3>
+
+<code><pre>
+  (request :content (get-history :of <var>table-ID</var>))
+</pre></code>
+
+<p>This will answer with information about the history of the table identified by <var>table-ID</var> in the following format:</p>
+
+<code><pre>
+  (reply :content (report :content (answer
+    :origin <var>region</var>
+    :edits (
+      <var>edit-1</var>
+      <var>edit-2</var>
+      <var>...</var>
+      )
+    :num-rows <var>num-rows</var>
+    :num-columns <var>num-columns</var>
+    )))
+</pre></code>
+
+<p>The <code>:origin</code> is the rectangular region that was originally selected to produce the first part of the table (any <code>merge-tables</code> edits are not considered for this). The <code>:edits</code> include only the edits that currently apply to the table (not undone edits), and appear in the order they were made. Edits resulting from <code>auto-<var>*</var></code> requests appear individually. The dimensions of the table, <var>num-rows</var> and <var>num-columns</var>, are the current dimensions, after the edits.</p>
+
+<h3>The <code>detect-paragraph-regions</code> request</h3>
+
+<code><pre>
+  (request :content (detect-paragraph-regions :page <var>page-id</var>))
+</pre></code>
+
+<p>This will detect and select rectangular regions of a page that might correspond to text paragraphs, and answer with a list of them, in the same format as <code>detect-table-regions</code>.</p>
+
+<h3>The <code>get-content</code> request</h3>
+
+<code><pre>
+  (request :content (get-content
+     :of { <var>region-id</var> | (cell :row <var>row</var> :column <var>column</var> :table <var>table-id</var>) }
+     [ :format { "text/plain" | "text/html" } ]
+     ))
+</pre></code>
+
+<p>This will answer with the text or HTML (by default text) content of a region detected with <code>detect-paragraph-regions</code>, or of a single table cell:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :content "<var>text-or-html-content</var>")))
+</pre></code>
+
+<p>It will not work on other kinds of region, like manually-selected ones or detected table regions. And it will not work (yet) on whole tables, selections of multiple table cells, documents, or pages.</p>
+
+<p>When <code>:format "text/html"</code> is supplied, the content will be an HTML fragment, with superscripts annotated with <code>&lt;sup&gt;</code> elements, and <code>&lt;br/&gt;</code> for line breaks.</p>
+
+<h3>The <code>detect-ruling-regions</code> request</h3>
+
+<code><pre>
+  (request :content (detect-ruling-regions :page <var>page-id</var>))
+</pre></code>
+
+<p>This will detect and select 1-pixel-wide rectangular regions of a page that correspond to horizontal or vertical ruling lines, and answer with a list of them, in a similar format to <code>detect-table-regions</code>, except that each region will be a <code>horizontal</code> or a <code>vertical</code> instead of a <code>rectangle</code>:</p>
+
+<code><pre>
+  (horizontal :id <var>region-id</var> :x <var>min-x</var> :y <var>min-y</var> :w <var>width</var>)
+  (vertical :id <var>region-id</var> :x <var>min-x</var> :y <var>min-y</var> :h <var>height</var>)
+</pre></code>
+
+<p>These correspond exactly to <code>rectangle</code>s with the missing coordinate (<code>:w</code> or <code>:h</code>) set to 1.</p>
+
+<p>Note that these rulings are in terms of pixels, in contrast to the rulings you might get from the <code>parse-table</code> request, which are in terms of table cells. It is not necessary to call <code>detect-ruling-regions</code> before <code>parse-table</code>; the latter will find rulings regardless (but won't give them IDs or make them available for relation).</p>
+
+<h3>The <code>relate-regions</code> request</h3>
+
+<code><pre>
+  (request :content (relate-regions :a <var>region-A-id</var> :b <var>region-B-id</var>))
+</pre></code>
+
+<p>This will describe the spatial relationship between two rectangular regions, A and B, in terms of the relationships of their respective horizontal (X) and vertical (Y) intervals, independently. A and B may be any kind of rectangular region, including detected rulings.</p>
+
+<code><pre>
+  (reply :content (report :content (answer
+    :a <var>region-A-id</var>
+    :horizontally <var>horizontal-interval-relation</var>
+    :vertically <var>vertical-interval-relation</var>
+    :b <var>region-B-id</var>
+    )))
+</pre></code>
+
+<p>These interval relationships use <a href="https://en.wikipedia.org/wiki/Allen%27s_interval_algebra">Allen's interval algebra</a>, summarized here:
+<table class="intervals">
+ <tr><th>Interval relation</th><th rowspan="2" colspan="4">Horizontal illustration</th></tr>
+ <tr><th>and its inverse</th></tr>
+ <tr class="reln"><td>A before B</td><td class="a">A</td><td colspan="3" class="o"></td></tr>
+ <tr class="inv"><td>B after A</td><td colspan="3" class="o"></td><td class="b">B</td></tr>
+ <tr class="reln"><td>A meets B</td><td colspan="2" class="a">A</td><td colspan="2" class="o"></td></tr>
+ <tr class="inv"><td>B met-by A</td><td colspan="2" class="o"></td><td colspan="2" class="b">B</td></tr>
+ <tr class="reln"><td>A overlaps B</td><td colspan="3" class="a">A</td><td class="o"></td></tr>
+ <tr class="inv"><td>B overlapped-by A</td><td class="o"></td><td colspan="3" class="b">B</td></tr>
+ <tr class="reln"><td>A finished-by B</td><td colspan="4" class="a">A</td></tr>
+ <tr class="inv"><td>B finishes A</td><td colspan="2" class="o"></td><td colspan="2" class="b">B</td></tr>
+ <tr class="reln"><td>A around B</td><td colspan="4" class="a">A</td></tr>
+ <tr class="inv"><td>B inside A</td><td class="o"></td><td colspan="2" class="b">B</td><td class="o"></td></tr>
+ <tr class="reln"><td>A starts B</td><td colspan="2" class="a">A</td><td colspan="2" class="o"></td></tr>
+ <tr class="inv"><td>B started-by A</td><td colspan="4" class="b">B</td></tr>
+ <tr class="reln"><td>A equal B</td><td colspan="4" class="a">A</td></tr>
+ <tr class="inv"><td>B equal A</td><td colspan="4" class="b">B</td></tr>
+</table>
+
+<h3>The <code>relate-all-regions</code> request</h3>
+
+<code><pre>
+  (request :content (relate-all-regions :page <var>page-id</var>))
+</pre></code>
+
+<p>This will effectively call <code>relate-regions</code> on each pair of regions on a given page, and answer with the spatial relationship of each pair, in a similar format, except that <code>answer</code> would be replaced with <code>relation</code>. For example, if the page has exactly three regions, arranged in a perfect horizontal row with space between them, you might get this reply:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :relations (
+    (relation :a region1 :horizontally before :vertically equal :b region2)
+    (relation :a region1 :horizontally before :vertically equal :b region3)
+    (relation :a region2 :horizontally after  :vertically equal :b region1)
+    (relation :a region2 :horizontally before :vertically equal :b region3)
+    (relation :a region3 :horizontally after  :vertically equal :b region1)
+    (relation :a region3 :horizontally after  :vertically equal :b region2)
+    ))))
+</pre></code>
+
+<h3>The <code>find-related-regions</code> request</h3>
+
+<code><pre>
+  (request :content (find-related-regions
+    [ :horizontally { <var>h-reln</var> | (<var>h-reln1</var> <var>h-reln2</var> ...) } ]
+    [ :vertically { <var>v-reln</var> | (<var>v-reln1</var> <var>v-reln2</var> ...) } ]
+    :region <var>region-B-id</var>
+    [ :order-by ( {{min|max}-{x|y}|width|height} {asc|desc} ) 
+      [ :soft-limit <var>soft-max-result-count</var> ] ]
+    [ :limit <var>max-result-count</var> ]
+    ))
+</pre></code>
+
+<p>This will find any "A" regions whose spatial relationship to the given "B" region matches that described by the <var>h-reln</var>s and <var>v-reln</var>s (not including the "B" region itself), optionally sort them according to <code>:order-by</code> and optionally take only the first <var>max-result-count</var> results. Omitting the <code>:horizontally</code> or <code>:vertically</code> argument means that that dimension is unrestricted; any relation matches. Supplying a list of relations instead of a single one means that any relation on the list matches.</p>
+
+<p>The <code>:order-by</code> and <code>:limit</code> arguments work like they do in an SQL <code>SELECT</code> query. The first element of the <code>:order-by</code> list indicates the property of the region to sort by, e.g. <code>min-y</code> would sort by the minimum Y coordinate. The second element indicates whether the sort should be in ascending (<code>asc</code>) or descending (<code>desc</code>) order of that property.</p>
+
+<p>The <code>:soft-limit</code> argument is like <code>:limit</code>, except that if the limit is reached, any later regions that compare equal to the last region that would otherwise be included (according to <code>:order-by</code>) are also included. For example if you specify <code>:order-by (width asc) :soft-limit 2</code>, and the relevant regions have widths <code>(42 57 57 57 99)</code>, then the first 4 regions will be returned.</p>
+
+<p>The answer will be in the same format as those of <code>detect-table-regions</code> and <code>detect-paragraph-regions</code>.</p>
+
+<h3>The <code>find-similar-regions</code> request</h3>
+
+<code><pre>
+  (request :content (find-similar-regions
+    :region (rectangle :page <var>page-id</var> :x <var>min-x</var> :y <var>min-y</var> :w <var>width</var> :h <var>height</var>)
+    [ :soft-limit <var>soft-max-result-count</var> ]
+    [ :limit <var>max-result-count</var> ]
+    ))
+</pre></code>
+
+<p>This will answer with a list of regions (similar to the answer to <code>find-related-regions</code>) on the page identified by <var>page-id</var>, ordered by their similarity to the given region. The <code>:limit</code> and <code>:soft-limit</code> arguments are similar to those of <code>find-related-regions</code>, except that it's not necessary (or possible) to also use <code>:order-by</code> when using <code>:soft-limit</code>. The order is always by ascending distance metric:</p>
+
+<code><pre>
+             |Δ<var>center-x</var>|   |Δ<var>center-y</var>|     |Δ<var>width</var>|       |Δ<var>height</var>|
+  <var>distance</var> = ----------- + ----------- + ------------ + -------------
+             <var>page-width</var>    <var>page-height</var>   <var>target-width</var>   <var>target-height</var>
+</pre></code>
+
+<p>...where <code>|Δ<var>foo</var>|</code> means the absolute value of the difference in <var>foo</var> between the specified target region and the found region. A <var>distance</var> of 0 is an exact match, and higher values are less accurate matches. There is no absolute maxiumum <var>distance</var>, and very large <var>distance</var>s can result if the target region is small and the found region is large.</p>
+
+<p>In the answer, an extra argument <code>:distance <var>distance</var></code> is added to each region.</p>
+
+<p>Alternatively, you can use <code>find-similar-regions</code> to find regions whose color is similar to a target color:</p>
+
+<code><pre>
+  (request :content (find-similar-regions
+    :region (rectangle :page <var>page-id</var> :color ONT::<var>color</var>)
+    [ :soft-limit <var>soft-max-result-count</var> ]
+    [ :limit <var>max-result-count</var> ]
+    ))
+</pre></code>
+
+<p>In this case the distance is Euclidean distance in the HSB color space:</p>
+
+<code><pre>
+               -------------------------------------
+	      |     2              2              2
+  <var>distance</var> = \| Δ<var>hue</var>  + Δ<var>saturation</var>  + Δ<var>brightness</var>
+</pre></code>
+
+<p>If you want the exact color, use <code>:limit 1</code> and make sure the returned region has <code>:distance 0</code>.</p>
+
+<h3>The <code>search</code> request</h3>
+
+<code><pre>
+  (request :content (search
+    :for "<var>search-string</var>"
+    :in <var>searchable-id</var>
+    [ :order-by ( {{max|min}-{x|y}|width|height|page-index|row|column} {asc|desc} )
+      [ :soft-limit <var>soft-max-result-count</var> ] ]
+    [ :limit <var>max-result-count</var> ]
+    ))
+</pre></code>
+
+<p>This will search the text of a searchable thing (a document, page, paragraph, or table) identified by <var>searchable-id</var>, for a substring that matches the given <var>search-string</var>. The matching is case-insensitive and non-word-splitting, and any string of whitespace will match any other string of whitespace. So for example the <var>search-string</var> "bar baz" will match in "foo bAr &nbsp; &nbsp; Baz glarch" but not in "foobar baz".</p>
+
+<p>The <code>:order-by</code>, <code>:soft-limit</code>, and <code>:limit</code> arguments are similar to those of <code>find-related-regions</code>, with some extra options for the first element of the <code>:order-by</code> list.</p>
+
+<p>Note that searching a document or page will only search in paragraphs that have already been detected using <code>detect-paragraph-regions</code>.</p>
+
+<p>The answer will be a list of matches:</p>
+
+<code><pre>
+  (reply :content (report :content (answer :matches (<var>match1</var> <var>match2</var> ...))))
+</pre></code>
+
+<p>Each match will be a structure like this:</p>
+
+<code><pre>
+  (match
+    :found "<var>matched-substring</var>"
+    :start <var>start-offset</var>
+    :end <var>end-offset</var>
+    :context "<var>cell-or-paragraph-text</var>"
+    {
+      :region (rectangle :id <var>region-id</var>
+			 :page (page :id <var>page-id</var>
+				     :document <var>document-id</var>
+				     :index <var>page-index</var>)
+			 :x <var>min-x</var> :y <var>min-y</var> :w <var>width</var> :h <var>height</var>)
+      |
+      :cell (cell :row <var>row</var> :column <var>column</var> :table <var>table-id</var>)
+    }
+  )
+</pre></code>
+
+<p>If you searched in a table, the matches will have the <code>:cell</code> argument, and the <code>:context</code> will be the text contents of that cell; otherwise the matches will have the <code>:region</code> argument, and the <code>:context</code> will be the text of that paragraph. The <var>matched-substring</var> is the substring of the <code>:context</code> that matched the <var>search-string</var>, at the character interval [<var>start-offset</var>,<var>end-offset</var>) in the <code>:context</code>.</p>
+
+<p>Note that you should only use <code>:order-by</code> arguments that make sense with the kind of matches you will get back. For example, paragraphs don't have <code>row</code> indexes, and table cells don't have (x,y) coordinates or <code>page-index</code>es. In general, a table cell doesn't retain its relationship to the region it originally came from, since it could have been edited in ways that make that relationship stop making sense.</p>
+
+<h3>Window management and failures</h3>
+
+<p>PDFExtractor supports the same KQML window management and failure reporting interfaces as ChartDisplay. See <a href="../ChartDisplay/README.html">the ChartDisplay README</a> for details. Note that PDFExtractor extends the <code>describe</code> request to cover anything in PDFExtractor that has an ID.</p>
+
+<h3>Extended example</h3>
+
+<p>Here is an extended example of how to use many of the features of PDFExtractor using the KQML interface. It uses a PDF file I <a href="http://www.swvt.uga.edu/2017/SYSR17/AP103-9-Final.pdf">downloaded</a> to the local file named <code>/u/wdebeaum/Download/AP103-9-Final.pdf</code> (note: that link is broken, and the file no longer appears to be available for download; only a description is available <a href="https://extension.uga.edu/publications/detail.html?number=AP103-9">here</a>). Comments appear inline after <code>;</code> characters. The <code>request</code> messages are to PDFExtractor, and the <code>reply</code> and <code>tell</code> messages are from PDFExtractor.</p>
+
+<code><pre>
+;; display the file in question, on page index 18
+;; (it's labeled 13 because they start from 1 and start over after page 6)
+(request :content (display :file (file :name "/u/wdebeaum/Download/AP103-9-Final.pdf") :page 18))
+;; a new window opens
+(tell :content (report :content (opened :what pdfextractor-win-0 :who sys)))
+;; and the requested page is displayed
+(tell :content (report :content (displayed
+  :what (page :id page20 :document document1 :index 18
+	      :bounds (rectangle :x 0.0 :y 0.0 :w 612.0 :h 792.0))
+  :where pdfextractor-win-0
+  )))
+;; automatically detect the part of this page that is a table
+(request :content (detect-table-regions :page page20))
+;; we detect only one rectangle that could be a table (it also appears higlighted in the display)
+(reply :content (report :content (answer :regions (
+  (rectangle :id region92
+    :page (page :id page20 :document document1 :index 18)
+    :x 0.0 :y 89.0 :w 545.0 :h 592.0)
+  ))))
+;; parse the table that's there
+(request :content (parse-table :region region92))
+;; we get the data and the ID of a new table
+(reply :content (report :content (answer :table
+  (table :id table93 :data (
+    ("" "" "2-Year" "" "" "" "2017 Data" "" "")
+    ("Company or" "" "Average" "" "" "" "Plant" "Wt of" "Seed")
+    ("Brand Name" "Variety" "Yield" "Rank" "Yield1" "Maturity" "Ht Lodg.2" "100 Seed" "Quality3")
+    ("" "" "bu/acre" "" "bu/acre" "date" "in rating" "gm" "rating")
+    ("Maturity Group V" "" "" "" "" "" "" "" "")
+    ("Dyna-Gro" "39RY57" "74.5" "4" "66.0" "09/26" "34 4.0" "16.0" "1.5")
+    <var>... more data ...</var>
+    ("Armor" "55-R68" "." "34" "51.7" "09/29" "34 4.7" "14.7" "1.7")
+    ))
+  :rulings ((horizontal :row 0 :first-column 3 :last-column 8))
+  )))
+;; display the table data in a new window
+(request :content (display-table :table table93))
+;; the window opens
+(tell :content (report :content (opened :what pdfextractor-win-1 :who sys)))
+;; the table is displayed in it
+(tell :content (report :content (displayed :what table93 :where pdfextractor-win-1)))
+;; user manually selects another (tall, skinny) region, and says "hey, there should be a column boundary here!"
+(tell :content (report :content (selected :what
+  (rectangle :id region94
+    :page (page :id page20 :document document1 :index 18)
+    :x 424.0 :y 103.0 :w 2.0 :h 596.0)
+  )))
+;; split that column
+(request :content (edit-table :table table93 :edit (split-column :at-x 424.0)))
+;; we get the updated table data (also displayed in the table window)
+(reply :content (report :content (answer :table
+  (table :id table93 :data (
+    ("" "" "2-Year" "" "" "" "2017 Da" "ta" "" "")
+    ("Company or" "" "Average" "" "" "" "Plant" "" "Wt of" "Seed")
+    ("Brand Name" "Variety" "Yield" "Rank" "Yield1" "Maturity" "Ht" "Lodg.2" "100 Seed" "Quality3")
+    ("" "" "bu/acre" "" "bu/acre" "date" "in" "rating" "gm" "rating")
+    ("Maturity Group V" "" "" "" "" "" "" "" "" "")
+    ("Dyna-Gro" "39RY57" "74.5" "4" "66.0" "09/26" "34" "4.0" "16.0" "1.5")
+    <var>... more data ...</var>
+    ("Armor" "55-R68" "." "34" "51.7" "09/29" "34" "4.7" "14.7" "1.7")
+    ))
+  :rulings ((horizontal :row 0 :first-column 3 :last-column 9))
+  )))
+;; user selects a row of the table (in the table window) and says "merge this row with the next one"
+(tell :content (report :content (selected :what (row :table table93 :index 1))))
+;; we merge those two rows
+(request :content (edit-table :table table93 :edit (merge-rows :first 1 :last 2)))
+;; more updated data
+(reply :content (report :content (answer :table
+  (table :id table93 :data (
+    ("" "" "2-Year" "" "" "" "2017 Da" "ta" "" "")
+    ("Company or
+Brand Name" "
+Variety" "Average
+Yield" "
+Rank" "
+Yield1" "
+Maturity" "Plant
+Ht" "
+Lodg.2" "Wt of
+100 Seed" "Seed
+Quality3")
+    ("" "" "bu/acre" "" "bu/acre" "date" "in" "rating" "gm" "rating")
+    ("Maturity Group V" "" "" "" "" "" "" "" "" "")
+    ("Dyna-Gro" "39RY57" "74.5" "4" "66.0" "09/26" "34" "4.0" "16.0" "1.5")
+    <var>... more data ...</var>
+    ("Armor" "55-R68" "." "34" "51.7" "09/29" "34" "4.7" "14.7" "1.7")
+    ))
+  :rulings ((horizontal :row 0 :first-column 3 :last-column 9))
+  )))
+;; merge some of the heading cells (intermediate responses omitted here for brevity)
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 0 :first-column 0 :last-row 1 :last-column 0)))
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 0 :first-column 1 :last-row 1 :last-column 1)))
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 0 :first-column 2 :last-row 1 :last-column 2)))
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 0 :first-column 3 :last-row 0 :last-column 9)))
+(reply :content (report :content (answer :table (table :id table93 :data (
+    ("
+Company or
+Brand Name" "
+
+Variety" "2-Year
+Average
+Yield" " 2017 Data" "" "" "" "" "" "")
+    ("" "" "" "
+Rank" "
+Yield1" "
+Maturity" "Plant
+Ht" "
+Lodg.2" "Wt of
+100 Seed" "Seed
+Quality3")
+    ("" "" "bu/acre" "" "bu/acre" "date" "in" "rating" "gm" "rating")
+    ("Maturity Group V" "" "" "" "" "" "" "" "" "")
+    ("Dyna-Gro" "39RY57" "74.5" "4" "66.0" "09/26" "34" "4.0" "16.0" "1.5")
+    <var>... more data ...</var>
+    ("Armor" "55-R68" "." "34" "51.7" "09/29" "34" "4.7" "14.7" "1.7")
+    ))
+  :rulings ((horizontal :row 0 :first-column 3 :last-column 9))
+  )))
+;; user scrolls to the next page
+(tell :content (report :content (displayed
+  :what (page :id page21 :document document1 :index 19)
+  :where pdfextractor-win-0
+  )))
+;; user manually selects the table this time, avoiding the headings
+(tell :content (report :content (selected :what
+  (rectangle :id region95
+    :page (page :id page21 :document document1 :index 19)
+    :x 68.0 :y 148.0 :w 468.0 :h 606.0)
+  )))
+;; we parse it
+(request :content (parse-table :region region95))
+;; get the table data back
+(reply :content (report :content (answer :table
+  (table :id table96 :data (
+    ("Terral Seed 56A58TM" "." "36" "50.6" "09/29" "32" "4.0" "14.9" "2.0")
+    <var>... more data ...</var>
+    ("Std Err. of Entry Mean" "2.5" "" "2.6" "01" "1" "0.3" "0.8" "0.03")
+    ))
+  :rulings ((horizontal :row 11 :first-column 0 :last-column 1))
+  )))
+;; and display it
+(request :content (display-table :table table96))
+;; it opens a 3rd window to display this table
+(tell :content (report :content (opened :what pdfextractor-win-2 :who sys)))
+(tell :content (report :content (displayed :what table96 :where pdfextractor-win-2)))
+;; the first column needs splitting, and the user selects a boundary
+(tell :content (report :content (selected :what
+  (rectangle :id region97
+    :page (page :id page21 :document document1 :index 19)
+    :x 146.0 :y 132.0 :w 2.0 :h 633.0)
+  )))
+;; and we split it
+(request :content (edit-table :table table96 :edit (split-column :at-x 146.0)))
+;; and get the table data back
+(reply :content (report :content (answer :table
+  (table :id table96 :data (
+    ("Terral Seed" "56A58TM" "." "36" "50.6" "09/29" "32" "4.0" "14.9" "2.0")
+    <var>... more data ...</var>
+    ("Std Err. of Entry Me" "an" "2.5" "" "2.6" "01" "1" "0.3" "0.8" "0.03")
+    ))
+  :rulings ((horizontal :row 11 :first-column 0 :last-column 1))
+  )))
+;; now the two tables have the same columns, so we merge the second into the first
+(request :content (edit-table :table table93 :edit (merge-tables :others (table96))))
+;; and get the table data back
+(reply :content (report :content (answer :table
+  (table :id table93 :data (
+    ;; here are the rows from the first table
+    ("" "" "2-Year" "" "" "" "2017 Da" "ta" "" "")
+    ("Company or
+Brand Name" "
+Variety" "Average
+Yield" "
+Rank" "
+Yield1" "
+Maturity" "Plant
+Ht" "
+Lodg.2" "Wt of
+100 Seed" "Seed
+Quality3")
+    ("" "" "bu/acre" "" "bu/acre" "date" "in" "rating" "gm" "rating")
+    ("Maturity Group V" "" "" "" "" "" "" "" "" "")
+    ("Dyna-Gro" "39RY57" "74.5" "4" "66.0" "09/26" "34" "4.0" "16.0" "1.5")
+    <var>... more data ...</var>
+    ("Armor" "55-R68" "." "34" "51.7" "09/29" "34" "4.7" "14.7" "1.7")
+    ;; and now here are the rows from the second table that we just put into the first table
+    ("Terral Seed" "56A58TM" "." "36" "50.6" "09/29" "32" "4.0" "14.9" "2.0")
+    <var>... more data ...</var>
+    ("Std Err. of Entry Me" "an" "2.5" "" "2.6" "01" "1" "0.3" "0.8" "0.03")
+    ))
+  :rulings (
+    (horizontal :row 0 :first-column 3 :last-column 9)
+    (horizontal :row 55 :first-column 0 :last-column 1)
+    )
+  )))
+;; we can close the second table window now
+(request :content (close :what pdfextractor-win-2))
+;; it closes
+(tell :content (report :content (closed :what pdfextractor-win-2 :who sys)))
+;; oops, forgot to merge some more cells on the second page
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 54 :first-column 0 :last-row 54 :last-column 1)))
+(request :content (edit-table :table table93 :edit (merge-cells
+  :first-row 88 :first-column 0 :last-row 88 :last-column 1)))
+;; user closes the first table window
+(tell :content (report :content (closed :what pdfextractor-win-1 :who usr)))
+;; user closes the document window
+(tell :content (report :content (closed :what pdfextractor-win-0 :who usr)))
+;; system saves the table data to a CSV file called "table93.csv"
+(request :content (save-table :table table93))
+(reply :content (report :content (answer :file
+  (file :name "table93.csv" :format "text/csv"))))
+</pre></code>
+
+</body>
+</html>
