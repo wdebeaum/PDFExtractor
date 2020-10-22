@@ -4,8 +4,6 @@ SRCS =	Args.java \
 	CWCException.java \
 	InvalidArgument.java \
 	InvalidArgumentCombo.java \
-	JavaFXApp.java \
-	JavaFXWindowManager.java \
 	MissingArgument.java \
 	StandardCWCModule.java \
 	SwingWindowManager.java \
@@ -14,8 +12,14 @@ SRCS =	Args.java \
 	WindowConfig.java \
 	WindowManager.java
 
-CLASSES = $(SRCS:.java=.class) \
-	JavaFXApp$$1.class
+# PDFExtractor doesn't use JavaFX, and it's no longer included with java (it's an external dependency), so don't try to compile JavaFX stuff:
+#	JavaFXApp.java \
+#	JavaFXWindowManager.java \
+
+CLASSES = $(SRCS:.java=.class)
+
+# \
+#	JavaFXApp$$1.class
 
 CONFIGDIR = ../../config
 include $(CONFIGDIR)/java/lib.mk

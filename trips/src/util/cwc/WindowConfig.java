@@ -4,8 +4,7 @@ import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.util.regex.*;
 import javax.swing.JFrame;
-import javafx.application.Platform;
-import javafx.stage.Stage;
+//import javafx.stage.Stage;
 import TRIPS.KQML.*;
 
 /** The configuration of a window, including its title, position, and size. All
@@ -45,7 +44,7 @@ public class WindowConfig {
 
   // FIXME does this have to be called from the UI thread?
   /** Extract configuration from an existing JavaFX window. */
-  public WindowConfig(Stage window) {
+  /*public WindowConfig(Stage window) {
     this(
       window.getTitle(),
       new Integer((int)window.getX()),
@@ -53,7 +52,7 @@ public class WindowConfig {
       new Integer((int)window.getWidth()),
       new Integer((int)window.getHeight())
     );
-  }
+  }*/
 
   /** Dynamically call either JFrame or Stage version of WindowConfig
    * constructor.
@@ -63,8 +62,8 @@ public class WindowConfig {
     // types here, but Java is being obstinate
     if (window instanceof JFrame) {
       return new WindowConfig((JFrame)window);
-    } else if (window instanceof Stage) {
-      return new WindowConfig((Stage)window);
+    /*} else if (window instanceof Stage) {
+      return new WindowConfig((Stage)window);*/
     } else {
       throw new RuntimeException("WindowConfig.fromWindow() expected a Stage or a JFrame, but got a " + window.getClass().getSimpleName());
     }
@@ -167,11 +166,11 @@ public class WindowConfig {
 
   /** Apply configuration to an existing JavaFX window. Must be called from the
    * UI thread. */
-  public void configure(Stage window) {
+  /*public void configure(Stage window) {
     if (title	!= null) { window.setTitle	(title); }
     if (left	!= null) { window.setX		(left	.doubleValue()); }
     if (top	!= null) { window.setY		(top	.doubleValue()); }
     if (width	!= null) { window.setWidth	(width	.doubleValue()); }
     if (height	!= null) { window.setHeight	(height	.doubleValue()); }
-  }
+  }*/
 }
