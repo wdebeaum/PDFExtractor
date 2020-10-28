@@ -119,23 +119,23 @@ all:: $(TABULA_JAR)
 
 install:: $(TABULA_JAR)
 
-CONFIGDIR=trips/src/config
+CONFIGDIR=trips-base/src/config
 include $(CONFIGDIR)/java/prog.mk
 
 # the following two rules added for standalone git version
-# override TRIPS symlink in this dir to point to trips/src/ instead of ../
+# override TRIPS symlink in this dir to point to trips-base/src/ instead of ../
 # and make a symlink back up here
 TRIPS-stamp:: Makefile
-	rm -f TRIPS trips/src/PDFExtractor
-	ln -s trips/src/ TRIPS
-	(cd trips/src/ && ln -s ../../ PDFExtractor)
+	rm -f TRIPS trips-base/src/PDFExtractor
+	ln -s trips-base/src/ TRIPS
+	(cd trips-base/src/ && ln -s ../../ PDFExtractor)
 	date >TRIPS-stamp
 
 # install/clean dependencies from TRIPS
 install clean::
-	cd trips/src/KQML && make $@
-	cd trips/src/TripsModule && make $@
-	cd trips/src/util/cwc && make $@
+	cd trips-base/src/KQML && make $@
+	cd trips-base/src/TripsModule && make $@
+	cd trips-base/src/util/cwc && make $@
 
 $(TABULA_JAR): technology/tabula/PublicRSI.java
 	curl -L -O https://github.com/tabulapdf/tabula-java/releases/download/v$(TABULA_VERSION)/tabula-$(TABULA_VERSION)-jar-with-dependencies.jar

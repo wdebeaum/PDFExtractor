@@ -2,7 +2,7 @@
 
 PDFExtractor displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses [Tabula](https://tabula.technology/) for table extraction, and [Apache PDFBox](https://pdfbox.apache.org/) for reading and drawing PDF files.
 
-This file is the README for the standalone version of PDFExtractor. The main documentation in [README.html](README.html) is written in the context of TRIPS. For the standalone version, `$TRIPS_BASE` is `trips/`.
+This file is the README for the standalone version of PDFExtractor. The main documentation in [README.html](README.html) is written in the context of TRIPS. For the standalone version, `$TRIPS_BASE` is `trips-base/`.
 
 ## Build instructions ##
 
@@ -10,13 +10,13 @@ First, make sure you have a java compiler installed. Then build PDFExtractor its
 
     ./configure [--with-java=/path/to/java] [--with-javac=/path/to/javac] [--with-jar=/path/to/jar]
     make
-    make install # installs to trips/etc/ and trips/bin/
+    make install # installs to trips-base/etc/ and trips-base/bin/
 
 ## Run instructions ##
 
 For standalone usage, you should give PDFExtractor the `-standalone` option:
 
-    ./trips/bin/PDFExtractor -standalone
+    ./trips-base/bin/PDFExtractor -standalone
 
 For the details of how to use it in this and other modes, see [README.html](README.html).
 
