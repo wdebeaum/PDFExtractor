@@ -47,7 +47,7 @@ tr.inv td {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2020/11/19 14:52:12 $
+$Date: 2020/11/19 15:03:27 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -165,7 +165,7 @@ $Date: 2020/11/19 14:52:12 $
 <ul>
  <li>Getting and opening the document.
   <ul>
-   <li>Download <a href="http://www.swvt.uga.edu/2017/SYSR17/AP103-9-Final.pdf">this PDF file</a>.
+   <li>Download <a href="https://swvt.uga.edu/content/dam/caes-subsite/statewide-variety-testing/docs/performance-trials/2017/2017-soybean-sorghum-summer-annual-performance-test.pdf">this PDF file</a>.
    <li>Start PDFExtractor in standalone mode: <code><var>$TRIPS_BASE</var>/bin/PDFExtractor -standalone</code>
    <li>Choose the file you downloaded in the file chooser.
    <li>A document window appears showing the first page of the file.
@@ -809,7 +809,7 @@ $Date: 2020/11/19 14:52:12 $
 
 <h3>Extended example</h3>
 
-<p>Here is an extended example of how to use many of the features of PDFExtractor using the KQML interface. It uses a PDF file I <a href="http://www.swvt.uga.edu/2017/SYSR17/AP103-9-Final.pdf">downloaded</a> to the local file named <code>/u/wdebeaum/Download/AP103-9-Final.pdf</code> (note: that link is broken, and the file no longer appears to be available for download; only a description is available <a href="https://extension.uga.edu/publications/detail.html?number=AP103-9">here</a>). Comments appear inline after <code>;</code> characters. The <code>request</code> messages are to PDFExtractor, and the <code>reply</code> and <code>tell</code> messages are from PDFExtractor.</p>
+<p>Here is an extended example of how to use many of the features of PDFExtractor using the KQML interface. It uses a PDF file I <a href="https://swvt.uga.edu/content/dam/caes-subsite/statewide-variety-testing/docs/performance-trials/2017/2017-soybean-sorghum-summer-annual-performance-test.pdf">downloaded</a> to the local file named <code>/u/wdebeaum/Download/AP103-9-Final.pdf</code> (that was the original name of the file before the link changed). Comments appear inline after <code>;</code> characters. The <code>request</code> messages are to PDFExtractor, and the <code>reply</code> and <code>tell</code> messages are from PDFExtractor.</p>
 
 <code><pre>
 ;; display the file in question, on page index 18
