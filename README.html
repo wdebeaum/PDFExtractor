@@ -47,7 +47,7 @@ tr.inv td {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2020/11/19 15:03:27 $
+$Date: 2020/11/19 15:28:18 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -126,7 +126,7 @@ $Date: 2020/11/19 15:03:27 $
 
 <p>Sometimes Tabula will put data that should be in multiple columns instead into a single column. In order to split such columns, you must provide it a vertical line to form the new column boundary, identified by its X coordinate in pixels. This is different from most other edits, which deal with selections of table cells, not pixels, so it warrants further explanation. The table window is where you deal in table cells, while the document window is where you deal in pixels.</p>
 
-<p>To split a column, switch from the table window back to the document window, on the page the table came from, and select a region whose left edge is the new column boundary you want. Then switch back to the table window, where a new <code>Split column at X=<var>x</var></code> button should have appeared (<var>x</var> is the X coordinate of the left edge of the region you just selected). If you click this button, the column that the new boundary is in will be split on that boundary.</p>
+<p>To split a column, switch from the table window back to the document window, on the page the table came from, and select a region whose left edge is the new column boundary you want (the other edges don't matter, and the region doesn't even have to overlap the table, though that's a good idea; it's also a good idea to start from the right and drag towards the left so you can make adjustments there as you drag). Then switch back to the table window, where a new <code>Split column at X=<var>x</var></code> button should have appeared (<var>x</var> is the X coordinate of the left edge of the region you just selected). If you click this button, the column that the new boundary is in will be split on that boundary.</p>
 
 <p>Usually in this situation, some of the cells (e.g. shared headings) should not be split. Use the <code>Merge Cells</code> or <code>Auto-Merge Cells</code> buttons to merge those cells again after splitting the column.</p>
 
