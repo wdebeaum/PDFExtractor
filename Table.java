@@ -726,6 +726,18 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	if (span.height > maxRowspan)
 	  maxRowspan = span.height;
       }
+      // row spans in different columns may overlap in nontrivial ways; make
+      // sure we keep expanding the span of this row group to include spans of
+      // non-first rows in the group, until no cell in the group extends
+      // outside the group
+      for (int i2 = i + 1; i2 < numRows && i2 < i + maxRowspan; i2++) {
+	for (RectangularTextContainer cell : rows.get(i2)) {
+	  Dimension span = Cell.getSpanOf(cell);
+	  int maybeNewRowspan = span.height + i2 - i;
+	  if (maybeNewRowspan > maxRowspan)
+	    maxRowspan = maybeNewRowspan;
+	}
+      }
       if (maxRowspan > 1)
 	haveRowgroups = true;
       rowgroupSpans[i] = maxRowspan;
