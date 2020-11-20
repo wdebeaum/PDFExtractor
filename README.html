@@ -47,7 +47,7 @@ tr.inv td {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2020/11/19 19:53:13 $
+$Date: 2020/11/20 14:32:29 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -157,6 +157,14 @@ $Date: 2020/11/19 19:53:13 $
 </dl>
 
 <p>You can also edit multiple cells at once, by selecting all of them and clicking the <code>Edit Cells</code> button. A similar window will appear, but it will only have the <code>Annotations</code> and <code>Cell type</code> fields. The contents of the cells won't change, and the <code>Heading for cells</code> field will use its default value for the type and the position of the cell in the table. If the default isn't what you want, you can edit each cell individually. For example, you could select the top few rows of a table, click <code>Edit Cells</code> and set their type to <code>column heading</code>. Then you could close that window, select one of the column headings, click <code>Edit Cell</code>, and change its <code>Heading for cells</code> field.</p>
+
+<h3>Save formats and opening tables in other programs</h3>
+
+<p>You can save a table in two different formats: CSV and HTML. CSV is less expressive (in particular it doesn't support cells that span multiple rows or columns; their contents appear in the top left cell in the span) but it is more widely supported. You might prefer CSV for simpler tables that you want to import into a database or other program, while you might prefer HTML for tables with more complex structure that you want to import into a spreadsheet that can handle it. The PDFLearn component in TRIPS also uses HTML tables from PDFExtractor.</p>
+
+<p>Note that if a cell contains line breaks (as a vertically-merged cell would) and you import it from CSV in Excel, for example, you might only see the first line displayed in the cell, and that first line might be blank. You can delete the line breaks or resize the row that the cell is in, in order to see the cell contents better.</p>
+
+<p>Excel can also import HTML tables, which reportedly work better. PDFExtractor does include some JavaScript code related to tooltips in the HTML, and Excel includes the code at the end of the table instead of running it. Just ignore it or delete it.</p>
 
 <h3>Extended example</h3>
 
