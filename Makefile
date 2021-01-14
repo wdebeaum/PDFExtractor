@@ -67,6 +67,8 @@ CLASSES=$(SRCS:.java=.class) \
 	PDFExtractor$$2.class \
 	PDFExtractor$$3.class \
 	PDFExtractor$$4.class \
+	PDFExtractor$$5.class \
+	PDFExtractor$$6.class \
 	PDFPane$$Listener.class \
 	Region$$1.class \
 	Region$$Coord.class \

@@ -811,10 +811,16 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
       matches.select();
       answer(msg, ":matches", matches.toKQML());
     } else if (verb.equals("display")) {
-      KQMLPerformative file = interpretFileArg(content, null);
-      int page = Args.getTypedArgument(content, ":page", Integer.class, 0);
-      String filename = Args.getTypedArgument(file, ":name", String.class);
-      displayPDF(new File(filename), page, new WindowConfig(content));
+      SwingUtilities.invokeLater(new Runnable() { public void run() {
+	try {
+	  KQMLPerformative file = interpretFileArg(content, null);
+	  int page = Args.getTypedArgument(content, ":page", Integer.class, 0);
+	  String filename = Args.getTypedArgument(file, ":name", String.class);
+	  displayPDF(new File(filename), page, new WindowConfig(content));
+	} catch (Exception e) {
+	  reportFailure(e, msg);
+	}
+      }});
     } else if (verb.equals("display-table")) {
       KQMLObject tableKQML = Args.getTypedArgument(content, ":table", KQMLObject.class);
       Table table = Table.fromKQML(tableKQML);
@@ -888,19 +894,28 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
       ans.setParameter(":edits", editsKQML);
       report(msg, ans);
     } else if (verb.equals("save-table")) {
-      // interpret :table argument
-      String tableID =
-	Args.getTypedArgument(content, ":table", KQMLToken.class).toString();
-      Table table = HasID.get(tableID, Table.class);
-      // interpret :file argument
-      KQMLPerformative filePerf =
-        interpretFileArg(content, tableID);
-      String filename = Args.getTypedArgument(filePerf, ":name", String.class);
-      String format = Args.getTypedArgument(filePerf, ":format", String.class);
-      // actually save the table to the file
-      table.write(format, new File(filename));
-      // reply
-      answer(msg, ":file", filePerf);
+      SwingUtilities.invokeLater(new Runnable() { public void run() {
+	try {
+	  // interpret :table argument
+	  String tableID =
+	    Args.getTypedArgument(content, ":table", KQMLToken.class).
+	    toString();
+	  Table table = HasID.get(tableID, Table.class);
+	  // interpret :file argument
+	  KQMLPerformative filePerf =
+	    interpretFileArg(content, tableID);
+	  String filename =
+	    Args.getTypedArgument(filePerf, ":name", String.class);
+	  String format =
+	    Args.getTypedArgument(filePerf, ":format", String.class);
+	  // actually save the table to the file
+	  table.write(format, new File(filename));
+	  // reply
+	  answer(msg, ":file", filePerf);
+	} catch (Exception e) {
+	  reportFailure(e, msg);
+	}
+      }});
     } else if (verb.equals("get-history")) {
       String tableID =
         Args.getTypedArgument(content, ":of", KQMLToken.class).toString();
@@ -981,7 +996,8 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
    * arbitrary :file argument. May use a file chooser dialog. If tableID is
    * given, table formats are used, and the tableID is used to construct the
    * default file name. Otherwise, PDF format is assumed, and no default
-   * filename is used.
+   * filename is used. Note that this must be run on the UI thread since it can
+   * open a file chooser dialog (and waits for a file to be chosen).
    */
   KQMLPerformative interpretFileArg(KQMLPerformative operation, String tableID)
       throws CWCException, KQMLException {
