@@ -42,12 +42,22 @@ tr.inv td {
   border-top: 0px;
   border-bottom: 5px solid white;
 }
+img {
+  background-color: #ccc;
+  border-style: solid;
+  border-width: 2px;
+  padding: 2px;
+  border-left-color: #eee;
+  border-top-color: #eee;
+  border-right-color: #666;
+  border-bottom-color: #666;
+}
 </style>
 </head>
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2020/11/20 14:32:29 $
+$Date: 2021/01/13 22:29:10 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -86,25 +96,25 @@ $Date: 2020/11/20 14:32:29 $
 
 <p>A table window contains a spreadsheet-like display of the data in the table. You can select rectangular regions of cells by dragging the mouse across them. You can also select whole rows or columns (or ranges thereof) by clicking on (or dragging across) the gray row or column headings.</p>
 
-<p>This window also has a toolbar along the top, with buttons you can click on to save or edit the table. Different editing buttons may be visible depending on what is currently selected. The following table lists all the buttons that may appear in this toolbar:</p>
+<p>This window also has a toolbar along the top, with buttons you can click on to save or edit the table. Different editing buttons may be visible depending on what is currently selected. The following table lists all the buttons that may appear in this toolbar. The first column shows both the icon that appears on the button and the text that appears in a tooltip when the mouse cursor hovers over the button.</p>
 
 <table class="ruled">
 <tr><th>Button</th><th>Description</th><th>Appears when...</th><th>KQML</th></tr>
-<tr><td><code>Save csv...</code></td><td>Saves the table data as a Comma-Separated Values (<code>.csv</code>) file (after you choose the file to save to in the file chooser window it opens). Individually-merged cells put their data in their top-left cell, and superscripts and edited cell properties are not preserved.</td><td>always</td><td><code>save-table</code></td></tr>
-<tr><td><code>Save html...</code></td><td>Saves the table data as an HTML <code>&lt;table&gt;</code>. Unlike the CSV format, this will preserve individually-merged cells (using <code>rowspan</code>/<code>colspan</code>), superscripts, and edited cell properties.</td><td>always</td><td><code>save-table</code></td></tr>
-<tr><td><code>Undo</code></td><td>Moves backward in the edit history.</td><td>some edits have been done</td><td><code>undo</code></td></tr>
-<tr><td><code>Redo</code></td><td>Moves forward in the edit history.</td><td>some edits remain undone, and no new edits have taken their place in the edit history</td><td><code>redo</code></td></tr>
-<tr><td><code>Auto-Split Columns</code></td><td>Attempts to split columns (as if by multiple <code>Split Column at X=<var>x</var></code> edits) automatically, and then re-merge some of the cells in those columns (as if by multiple <code>Merge Cells</code> edits), based on (partial) vertical ruling lines in the original document.</td><td>auto-split has not yet been done</td><td><code>auto-split-columns</code></td></tr>
-<tr><td><code>Auto-Merge Cells</code></td><td>Attempts to merge cells (as if by multiple <code>Merge Cells</code> edits) automatically, based on ruling lines and spacing in the original document.</td><td>auto-merge has not yet been done</td><td><code>auto-merge-cells</code></td></tr>
-<tr><td><code>Delete Rows</code></td><td>Deletes the selected rows.</td><td>some whole rows are selected<a href="#nm">*</a></td><td><code>delete-rows</code></td></tr>
-<tr><td><code>Delete Columns</code></td><td>Deletes the selected columns.</td><td>some whole columns are selected<a href="#nm">*</a></td><td><code>delete-columns</code></td></tr>
-<tr><td><code>Merge Rows</code></td><td>Replaces the selected rows with a single row. In the new cells, the old rows will be separated by newlines.</td><td>multiple whole rows are selected<a href="#nm">*</a></td><td><code>merge-rows</code></td></tr>
-<tr><td><code>Merge Columns</code></td><td>Replaces the selected columns with a single column. In the new cells, the old columns will be separated by spaces where the amount of space in the original document warrants it.</td><td>multiple whole columns are selected<a href="#nm">*</a></td><td><code>merge-columns</code></td></tr>
-<tr><td><code>Merge Cells</code></td><td>Replace the selected cells with a single, individually-merged cell, while leaving the rest of the cells in the same rows or same columns separate.</td><td>multiple cells are selected<a href="#nm">*</a></td><td><code>merge-cells</code></td></tr>
-<tr><td><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
-<tr><td><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels).</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
-<tr><td><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
-<tr><td><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
+<tr><td><img src="images/save-csv.png"><br><code>Save csv...</code></td><td>Saves the table data as a Comma-Separated Values (<code>.csv</code>) file (after you choose the file to save to in the file chooser window it opens). Individually-merged cells put their data in their top-left cell, and superscripts and edited cell properties are not preserved.</td><td>always</td><td><code>save-table</code></td></tr>
+<tr><td><img src="images/save-html.png"><br><code>Save html...</code></td><td>Saves the table data as an HTML <code>&lt;table&gt;</code>. Unlike the CSV format, this will preserve individually-merged cells (using <code>rowspan</code>/<code>colspan</code>), superscripts, and edited cell properties.</td><td>always</td><td><code>save-table</code></td></tr>
+<tr><td><img src="images/undo.png"><br><code>Undo</code></td><td>Moves backward in the edit history.</td><td>some edits have been done</td><td><code>undo</code></td></tr>
+<tr><td><img src="images/redo.png"><br><code>Redo</code></td><td>Moves forward in the edit history.</td><td>some edits remain undone, and no new edits have taken their place in the edit history</td><td><code>redo</code></td></tr>
+<tr><td><img src="images/auto-split-columns.png"><br><code>Auto-Split Columns</code></td><td>Attempts to split columns (as if by multiple <code>Split Column at X=<var>x</var></code> edits) automatically, and then re-merge some of the cells in those columns (as if by multiple <code>Merge Cells</code> edits), based on (partial) vertical ruling lines in the original document.</td><td>auto-split has not yet been done</td><td><code>auto-split-columns</code></td></tr>
+<tr><td><img src="images/auto-merge-cells.png"><br><code>Auto-Merge Cells</code></td><td>Attempts to merge cells (as if by multiple <code>Merge Cells</code> edits) automatically, based on ruling lines and spacing in the original document.</td><td>auto-merge has not yet been done</td><td><code>auto-merge-cells</code></td></tr>
+<tr><td><img src="images/delete-rows.png"><br><code>Delete Rows</code></td><td>Deletes the selected rows.</td><td>some whole rows are selected<a href="#nm">*</a></td><td><code>delete-rows</code></td></tr>
+<tr><td><img src="images/delete-columns.png"><br><code>Delete Columns</code></td><td>Deletes the selected columns.</td><td>some whole columns are selected<a href="#nm">*</a></td><td><code>delete-columns</code></td></tr>
+<tr><td><img src="images/merge-rows.png"><br><code>Merge Rows</code></td><td>Replaces the selected rows with a single row. In the new cells, the old rows will be separated by newlines.</td><td>multiple whole rows are selected<a href="#nm">*</a></td><td><code>merge-rows</code></td></tr>
+<tr><td><img src="images/merge-columns.png"><br><code>Merge Columns</code></td><td>Replaces the selected columns with a single column. In the new cells, the old columns will be separated by spaces where the amount of space in the original document warrants it.</td><td>multiple whole columns are selected<a href="#nm">*</a></td><td><code>merge-columns</code></td></tr>
+<tr><td><img src="images/merge-cells.png"><br><code>Merge Cells</code></td><td>Replace the selected cells with a single, individually-merged cell, while leaving the rest of the cells in the same rows or same columns separate.</td><td>multiple cells are selected<a href="#nm">*</a></td><td><code>merge-cells</code></td></tr>
+<tr><td><img src="images/merge-tables.png"><br><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window, and in the tooltip for this button) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
+<tr><td><img src="images/split-column.png"><br><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels). The <var>x</var> coordinate appears in the tooltip for this button.</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
+<tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
+<tr><td><img src="images/edit-cells.png"><br><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
 </table>
 <p><a name="nm">*</a> and the selection touches no individually-merged cells</p>
 

@@ -78,7 +78,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     table.addTableModelListener(this); // table isn't displayed yet, but will be
     if (table.origin != null)
       table.origin.getPage().addPageListener(this);
-    setPreferredSize(new Dimension(360, 32)); // enough room for all buttons
+    setPreferredSize(new Dimension(44*14+22+2, 46)); // enough room for 14.5 buttons
   }
 
   // when adding an action that keeps its button, add the button to the action
@@ -92,8 +92,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   public abstract class EditAction extends ActionWithButton {
     Table.Edit edit;
 
-    public EditAction(String buttonLabel) {
-      super(buttonLabel);
+    public EditAction(String buttonLabel, String iconName) {
+      super(buttonLabel, iconName);
       edit = null;
     }
 
@@ -130,7 +130,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     Method editFromSelection;
 
     public SelectionEditAction(Class<? extends Table.Edit> c) {
-      super(Table.getButtonLabel(c));
+      super(Table.getButtonLabel(c), Table.getKQMLVerb(c));
       editClass = c;
       String className = editClass.getSimpleName();
       String fromSelectionName =
@@ -166,7 +166,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 
   public class MergeTablesAction extends EditAction {
     public MergeTablesAction(Table other) throws Table.BadEdit {
-      super("Append rows of " + other.getID());
+      super("Append rows of " + other.getID(), "merge-tables");
       if (table == other)
 	throw new Table.BadEdit("expected another table");
       if (table.getColumnCount() != other.getColumnCount())
@@ -228,7 +228,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 
   public class SplitColumnAction extends EditAction {
     public SplitColumnAction(float newColBoundX) throws Table.BadEdit {
-      super("Split column at X=" + newColBoundX);
+      super("Split column at X=" + newColBoundX, "split-column");
       double minX = table.origin.getMinX();
       double maxX = table.origin.getMaxX();
       if (newColBoundX <= minX || newColBoundX >= maxX) {
@@ -278,7 +278,9 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   }
 
   public abstract class AutoMultiEditAction extends ActionWithButton {
-    public AutoMultiEditAction(String name) { super(name); }
+    public AutoMultiEditAction(String name, String iconName) {
+      super(name, iconName);
+    }
     public abstract List<Table.Edit> autoMultiEdit();
     @Override public void actionPerformed(ActionEvent evt) {
       List<Table.Edit> edits = autoMultiEdit();
@@ -294,7 +296,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 
   public class AutoSplitColumnsAction extends AutoMultiEditAction {
     public AutoSplitColumnsAction() {
-      super("Auto-Split Columns");
+      super("Auto-Split Columns", "auto-split-columns");
     }
 
     @Override public List<Table.Edit> autoMultiEdit() {
@@ -304,7 +306,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 
   public class AutoMergeCellsAction extends AutoMultiEditAction {
     public AutoMergeCellsAction() {
-      super("Auto-Merge Cells");
+      super("Auto-Merge Cells", "auto-merge-cells");
     }
 
     @Override public List<Table.Edit> autoMultiEdit() {
@@ -315,7 +317,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   public class SaveAction extends ActionWithButton {
     String format;
     public SaveAction(String format) {
-      super("Save " + format.replaceFirst("^text/", "") + "...");
+      super("Save " + format.replaceFirst("^text/", "") + "...",
+            "save-" + format.replaceFirst("^text/", ""));
       this.format = format;
     }
 
@@ -339,7 +342,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   public class UndoRedoAction extends ActionWithButton {
     boolean isRedo;
     public UndoRedoAction(boolean isRedo) {
-      super(isRedo ? "Redo" : "Undo");
+      super(isRedo ? "Redo" : "Undo",
+            isRedo ? "redo" : "undo");
       this.isRedo = isRedo;
     }
     @Override public void actionPerformed(ActionEvent evt) {

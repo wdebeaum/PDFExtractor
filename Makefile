@@ -117,6 +117,23 @@ CLASSES=$(SRCS:.java=.class) \
 	VisibilityFilter$$Renderer.class \
 	VisibilityFilter$$ShownGlyph.class
 
+XTRA = \
+	images/auto-merge-cells.png \
+	images/auto-split-columns.png \
+	images/delete-columns.png \
+	images/delete-rows.png \
+	images/edit-cell.png \
+	images/edit-cells.png \
+	images/merge-cells.png \
+	images/merge-columns.png \
+	images/merge-rows.png \
+	images/merge-tables.png \
+	images/redo.png \
+	images/save-csv.png \
+	images/save-html.png \
+	images/split-column.png \
+	images/undo.png
+
 all:: $(TABULA_JAR)
 
 install:: $(TABULA_JAR)
