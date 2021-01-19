@@ -173,3 +173,6 @@ doc/index.html: $(SRCS)
 
 distclean:: clean
 	rm -f $(TABULA_JAR)
+
+print-tabula-jar:
+	$(info $(TABULA_JAR))
