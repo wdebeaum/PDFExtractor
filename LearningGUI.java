@@ -58,10 +58,12 @@ public class LearningGUI extends StandardCWCModule implements ActionListener {
 	executeButton.addActionListener(LearningGUI.this);
 	c.gridx = 3; c.weightx = 0;
 	window.add(executeButton, c);
+	c.gridx = 4;
+	window.add(new HelpButton((SwingWindowManager)windowManager), c);
 	learnedRulesModel = new DefaultListModel<Rule>();
 	learnedRules = new JList<Rule>(learnedRulesModel);
 	JScrollPane lrScroll = new JScrollPane(learnedRules);
-	c.gridx = 0; c.gridy = 1; c.gridwidth = 4;
+	c.gridx = 0; c.gridy = 1; c.gridwidth = 5;
 	c.weightx = 1; c.weighty = 1;
 	window.add(lrScroll, c);
 	status = new JLabel("started");

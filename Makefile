@@ -14,6 +14,7 @@ SRCS=$(MAIN).java \
 	EditedCell.java \
 	HasID.java \
 	HasSortOrders.java \
+	HelpButton.java \
 	HTMLBuilder.java \
 	IntervalRelation.java \
 	LearningGUI.java \
@@ -118,6 +119,7 @@ CLASSES=$(SRCS:.java=.class) \
 	VisibilityFilter$$ShownGlyph.class
 
 XTRA = \
+	README.html \
 	images/auto-merge-cells.png \
 	images/auto-split-columns.png \
 	images/delete-columns.png \
