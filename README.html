@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/01/13 22:29:10 $
+$Date: 2021/01/20 16:07:11 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -74,15 +74,43 @@ $Date: 2021/01/13 22:29:10 $
 </pre></code>
 <p>Among other things, <code>make</code> will download a jar file that includes both Tabula and PDFBox, so be sure to have a connection to the Internet before you run <code>make</code>.</p>
 
-<h2>Standalone/GUI usage</h2>
+<h2><a name="gui">Standalone/GUI usage</a></h2>
 <p>PDFExtractor has a graphical interface, and acts as a TRIPS module; most of its functions can be used either way. This section describes the graphical interface. You can start PDFExtractor in standalone mode, meaning it will only have the graphical interface, and won't act as a TRIPS module (it won't connect to the facilitator or stdin/stdout, and it won't accept KQML requests or generate KQML reports):</p>
 
 <code><pre>
   <var>$TRIPS_BASE</var>/bin/PDFExtractor -standalone
 </pre></code>
 
+<p>In standalone mode, PDFExtractor will present a PDF file chooser on startup so that you can open the first PDF document.</p>
+
+<h3>LearningGUI</h3>
+
+<p>As a TRIPS module, PDFExtractor will start another module called LearningGUI, which is a quick and dirty way to drive PDFExtractor and PDFLearn to learn rules for finding and editing tables (and other page regions). To use LearningGUI to learn a rule:</p>
+
+<ul>
+ <li>Open a PDF document by clicking the <code>Open</code> button and choosing a file.
+ <li>Select a region on a page of the document and optionally:
+  <ul>
+   <li>parse it as a table
+   <li>edit the table
+   <li>save the table as an HTML file (this can help the system learn a better rule for finding the table region)
+  </ul>
+  (More details on how to do these things appear in the following sections.)
+ <li>Optionally enter some text associated with the region in the text field between the <code>Learn</code> and <code>Execute</code> buttons (again, it helps the system learn a better rule if the text appears on the page near or inside the region).
+ <li>Click the <code>Learn</code> button. PDFLearn will then attempt to learn how to do what you just did (except for saving the table), and a new rule will appear in the rule list below the buttons in the LearningGUI window.
+</ul>
+
+<p>To execute a rule:</p>
+<ul>
+ <li>Open another document page.
+ <li>Click on the rule you want to use in the LearningGUI window.
+ <li>Optionally enter something in the associated-text field (if you don't, PDFLearn will just use the same text (if any) used during learning).
+ <li>Click the <code>Execute</code> button. PDFLearn will then attempt to do what it learned to do when it learned the rule you selected: select a region on the page, and maybe parse it as a table and edit it.
+</ul>
+
 <h3>Document windows</h3>
-<p>In standalone mode, PDFExtractor will present a PDF file chooser on startup so that you can open the first PDF document, and after that you can use the <code>Open...</code> button in any document window to open other documents.</p>
+
+<p>After opening the first document, you can use the <code>Open...</code> button in any document window to open other documents.</p>
 
 <p>Pressing the "Page Up", "Page Down", "Home", or "End" keys in a document window, or scrolling with the mouse wheel/trackpad, will change which page of the document is displayed. You can also change the page by entering the (1-based) page number in the field labeled <code>Page:</code>.</p>
 
