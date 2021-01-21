@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/01/20 21:56:48 $
+$Date: 2021/01/21 21:33:54 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -93,11 +93,10 @@ $Date: 2021/01/20 21:56:48 $
   <ul>
    <li>parse it as a table
    <li>edit the table
-   <li>save the table as an HTML file (this can help the system learn a better rule for finding the table region)
   </ul>
   (More details on how to do these things appear in the following sections.)
- <li>Optionally enter some text associated with the region in the text field between the <code>Learn</code> and <code>Execute</code> buttons (again, it helps the system learn a better rule if the text appears on the page near or inside the region).
- <li>Click the <code>Learn</code> button. PDFLearn will then attempt to learn how to do what you just did (except for saving the table), and a new rule will appear in the rule list below the buttons in the LearningGUI window.
+ <li>Optionally enter some text associated with the region in the text field between the <code>Learn</code> and <code>Execute</code> buttons (it helps the system learn a better rule if the text appears on the page near or inside the region).
+ <li>Click the <code>Learn</code> button. PDFLearn will then attempt to learn how to do what you just did, and a new rule will appear in the rule list below the buttons in the LearningGUI window.
 </ul>
 
 <p>To execute a rule:</p>
