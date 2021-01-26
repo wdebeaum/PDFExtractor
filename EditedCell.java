@@ -61,6 +61,17 @@ public class EditedCell extends Cell {
   public Dimension getSpan() { return Cell.getSpanOf(original); }
 
   @Override
+  public boolean wasMergedIndividually() {
+    // NOTE: same as Cell.wasMergedIndividually(original), but original is RTC,
+    // not HasText
+    if (original instanceof Cell) {
+      return ((Cell)original).wasMergedIndividually();
+    } else {
+      return false;
+    }
+  }
+
+  @Override
   public CellProperties getProperties() {
     return properties;
   }
