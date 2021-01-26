@@ -1385,6 +1385,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     return ret;
   }
 
+  final static boolean debugASC = false;
+
   /** A potential automatic SplitColumn edit followed by MergeCells edits. */
   public class AutoSplitColumn implements Comparable<AutoSplitColumn> {
     public final float newColBoundX;
@@ -1392,11 +1394,15 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     public BitSet splitRows; // true for i that should stay split, false=>merge
     public boolean splitSucceeded;
 
-    public AutoSplitColumn(float x, int j) {
+    public AutoSplitColumn(float x, int j, BitSet splitRows) {
       newColBoundX = x;
       col = j;
-      splitRows = new BitSet(numRows); // initially all false
+      this.splitRows = splitRows;
       splitSucceeded = false;
+    }
+
+    public AutoSplitColumn(float x, int j) {
+      this(x, j, new BitSet(numRows)); // initially all false
     }
 
     /** Ensure that we will split rows in the interval [i1,i2]. */
@@ -1463,33 +1469,43 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
   }
 
-  /** Attempt to automatically detect X coordinates to (partially) split
-   * columns at, split them, and re-merge the parts that shouldn't be split
-   * (spanning column headers). Return the list of SplitColumn and MergeCells
-   * edits that were actually performed.
+  /** Would it be OK to split the given cell at the given X coordinate, as part
+   * of auto-split-columns?
    */
-  public List<Edit> autoSplitColumns() {
-    List<Ruling> pixelRulings = getPixelRulings();
-    Map<Float,AutoSplitColumn> x2asc = new TreeMap<Float,AutoSplitColumn>();
-    for (Ruling pr : pixelRulings) {
-      Ruling cr = pixelToCellRuling(pr, true);
-      // skip unless we have a vertical cell ruling
-      if (cr == null || cr.horizontal()) continue;
-      float x = pr.getPosition();
-      int j = (int)cr.getPosition();
-      // skip unless it actually splits the column somewhere
-      if (xIsBeforeCol(x, j) || xIsAfterCol(x, j)) continue;
-      // get the AutoSplitColumn we already made at this X, or make a new one
-      AutoSplitColumn asc = x2asc.get(x);
-      if (asc == null) {
-	asc = new AutoSplitColumn(x, j);
-	x2asc.put(x, asc);
+  static boolean isCellSplittableAtX(RectangularTextContainer cell, float splitX) {
+    float minDistance = 1000; // minimum distance from right of glyph to splitX
+    float maxWOS = 0; // maximum "width of space" measurement for a glyph
+    for (Object o : cell.getTextElements()) {
+      TextElement e = (TextElement)o;
+      String text = e.getText();
+      // skip whitespace glyphs
+      if (!Pattern.compile("\\S").matcher(text).find())
+	continue;
+      float wos = (float)e.getWidthOfSpace();
+      if ((!Float.isNaN(wos)) && maxWOS < wos) maxWOS = wos;
+      float left = e.getLeft();
+      float right = e.getRight();
+//      if (debugASC) System.err.println("      text=" + text + "; left=" + left + "; wos=" + wos + "; right=" + right);
+      float distance = 1000;
+      if (left >= splitX) { // glyph is entirely to the right of splitX
+	// we split on the left edge of a column detected by TextChunker, so
+	// this is expected and doesn't matter
+	continue;
+      } else if (splitX >= right) { // entirely to the left
+        distance = splitX - right;
+      } else { // splitX splits the glyph
+        distance = 0;
       }
-      // add this ruling to it
-      int i1 = (int)cr.getStart();
-      int i2 = (int)cr.getEnd();
-      asc.addRuling(i1, i2);
+      if (minDistance > distance) minDistance = distance;
+//      if (debugASC) System.err.println("        distance=" + distance);
+      if (distance == 0) break; // shortcut
     }
+//    if (debugASC) System.err.println("      minDistance = " + minDistance + "; maxWOS = " + maxWOS + "; cell splittable = " + (minDistance > maxWOS));
+    return (minDistance > maxWOS);
+  }
+
+  List<Edit> makeEditsForASCs(Map<Float,AutoSplitColumn> x2asc) {
+    if (debugASC) System.err.println("making edits from " + x2asc.size() + " AutoSplitColumns");
     AutoSplitColumn[] ascs = new AutoSplitColumn[x2asc.size()];
     x2asc.values().toArray(ascs);
     Arrays.sort(ascs); // sort by descending X
@@ -1511,9 +1527,173 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       k++;
     }
     // then merge the cells we didn't want split
+    // FIXME!!! need to merge mergecells edits from multiple adjacent ascs, or the left ones will be blocked by the right ones
+    // . pass ascs array and index to mergeCells and let it decide whether to merge now and how far to the right to merge, based on splitRows agreement with adjacent ascs with the same column index (will it still be the same after the adjustment above?)
     for (AutoSplitColumn asc : ascs) {
       edits.addAll(asc.mergeCells());
     }
+    return edits;
+  }
+
+  /** Attempt to automatically detect X coordinates to (partially) split
+   * columns at, split them, and re-merge the parts that shouldn't be split
+   * (spanning column headers). Return the list of SplitColumn and MergeCells
+   * edits that were actually performed.
+   */
+  public List<Edit> autoSplitColumns() {
+    // first, try splitting columns using ruling lines
+    List<Ruling> pixelRulings = getPixelRulings();
+    Map<Float,AutoSplitColumn> x2asc = new TreeMap<Float,AutoSplitColumn>();
+    for (Ruling pr : pixelRulings) {
+      Ruling cr = pixelToCellRuling(pr, true);
+      // skip unless we have a vertical cell ruling
+      if (cr == null || cr.horizontal()) continue;
+      float x = pr.getPosition();
+      int j = (int)cr.getPosition();
+      // skip unless it actually splits the column somewhere
+      if (xIsBeforeCol(x, j) || xIsAfterCol(x, j)) continue;
+      // get the AutoSplitColumn we already made at this X, or make a new one
+      AutoSplitColumn asc = x2asc.get(x);
+      if (asc == null) {
+	asc = new AutoSplitColumn(x, j);
+	x2asc.put(x, asc);
+      }
+      // add this ruling to it
+      int i1 = (int)cr.getStart();
+      int i2 = (int)cr.getEnd();
+      asc.addRuling(i1, i2);
+    }
+    List<Edit> edits = makeEditsForASCs(x2asc);
+    if (edits.isEmpty()) {
+      // splitting columns using ruling lines didn't do anything, give up on
+      // those ascs
+      x2asc.clear();
+      // instead try using TextChunker to detect consistent gaps between glyphs
+      // as column splits
+      // first get the list of glyphs from the tabula "page" (really page area)
+      // for the origin region
+      // FIXME? do we need to make a copy of the document like
+      // Page#detectParagraphRegions() does, or is this sufficient since we're
+      // not calling detect()?
+      technology.tabula.Page tabulaPage = origin.toTabulaPage();
+      List<TextElement> glyphs = tabulaPage.getText();
+      // make a horizontal (default) TextChunker and get columns from it
+      TextChunker tc = new TextChunker();
+      tc.addAll(glyphs);
+      List<TextChunker> tcColumns = tc.split();
+      // assign each tc column to a table column, and if it's the same as the
+      // previous tc column, split the table column between the two tc columns
+      int prevJ = -1;
+      TextChunker prevTCCol = null;
+      for (TextChunker tcCol : tcColumns) {
+	// get the center X coordinate inside tcCol
+	float cx = (float)((tcCol.minX + tcCol.maxX) / 2);
+	// find the index of the column that cx is inside (-1 because not after)
+	int j = xCoordToColIndex(cx) - 1;
+	if (debugASC) System.err.println("tcCol: minX=" + tcCol.minX + "; cx=" + cx + "; maxX=" + tcCol.maxX + "; j = " + j);
+	if (j >= 0 && j == prevJ) {
+	  // This tc column maps to the same table column as the previous one,
+	  // so we should split this table column between these two tc columns.
+	  // Search for a good X coordinate to split at based on how many rows
+	  // are splittable there.
+	  // start searching for split on left edge of right tc column
+	  float startX = (float)tcCol.minX;
+	  // search as far right as the center of right tc column
+	  float maxX = (float)((tcCol.minX + tcCol.maxX) / 2);
+	  // ... and as far left as the center of left tc column
+	  float minX = (float)((prevTCCol.minX + prevTCCol.maxX) / 2);
+	  float bestLeftX = startX, bestRightX = startX;
+	  int bestLeftCard = -1, bestRightCard = -1;
+	  float x;
+	  BitSet splitRows = new BitSet(numRows);
+	  // search rightward for start of fall in cardinality of splitRows
+	  // (i.e. the number of rows that would be split)
+	  if (debugASC) System.err.println("  searching rightward from " + startX + " to " + maxX + " for best split x");
+	  for (x = startX; x < maxX; x++) {
+	    splitRows.clear();
+	    // set which rows to split
+	    for (int i = 0; i < numRows; i++) {
+	      splitRows.set(i, isCellSplittableAtX(getCellAt(i, j), x));
+	    }
+	    int card = splitRows.cardinality();
+	    if (debugASC) System.err.println("    x=" + x + "; card=" + card);
+	    if (bestRightCard <= card) { // still not falling
+	      bestRightCard = card;
+	      bestRightX = x;
+	    } else { // falling
+	      break;
+	    }
+	  }
+	  // search leftward for end of rise in cardinality of splitRows
+	  if (debugASC) System.err.println("  searching leftward from " + (startX-1) + " to " + minX + " for best split x");
+	  for (x = startX - 1; x > minX; x--) {
+	    splitRows.clear();
+	    // set which rows to split
+	    for (int i = 0; i < numRows; i++) {
+	      splitRows.set(i, isCellSplittableAtX(getCellAt(i, j), x));
+	    }
+	    int card = splitRows.cardinality();
+	    if (debugASC) System.err.println("    x=" + x + "; card=" + card);
+	    if (bestLeftCard < card) { // still rising
+	      bestLeftCard = card;
+	      bestLeftX = x;
+	    } else if (bestLeftCard > card) { // falling
+	      // NOTE: we break when we see falling, but we only saved the best
+	      // X when we last saw rising. This lets us find the end of the
+	      // rise even if it has steps in it.
+	      break;
+	    }
+	  }
+	  if (bestLeftCard > bestRightCard) {
+	    // found strictly better split x to the left
+	    if (debugASC) System.err.println("  leftward was better");
+	    x = bestLeftX;
+	  } else {
+	    // found non-strictly better split x to the right
+	    if (debugASC) System.err.println("  rightward was good enough");
+	    x = bestRightX;
+	  }
+	  if (debugASC) System.err.println("  x=" + x);
+	  // set splitRows one last time using the best x
+	  // also make sure both new columns have some contents in split rows
+	  splitRows.clear();
+	  boolean leftHasContents = false, rightHasContents = false;
+	  for (int i = 0; i < numRows; i++) {
+	    RectangularTextContainer cell = getCellAt(i, j);
+	    boolean splitRow = isCellSplittableAtX(cell, x);
+	    splitRows.set(i, splitRow);
+	    if (splitRow) {
+	      for (Object o : cell.getTextElements()) {
+		TextElement e = (TextElement)o;
+		String text = e.getText();
+		// skip whitespace glyphs
+		if (!Pattern.compile("\\S").matcher(text).find())
+		  continue;
+		float c = (float)e.getCenterX();
+		if (debugASC) {
+		  if ((!leftHasContents) && c < x)
+		    System.err.println("    first left contents are on row " + i + ": " + text);
+		  if ((!rightHasContents) && c > x)
+		    System.err.println("    first right contents are on row " + i + ": " + text);
+		}
+		if (c < x) leftHasContents = true;
+		if (c > x) rightHasContents = true;
+	      }
+	    }
+	  }
+	  if (debugASC) System.err.println("  leftHasContents=" + leftHasContents + "; rightHasContents=" + rightHasContents + "; splitRows cardinality=" + splitRows.cardinality());
+	  if (leftHasContents && rightHasContents) {
+	    // make and add the ASC with the best x
+	    AutoSplitColumn asc = new AutoSplitColumn(x, j, splitRows);
+	    x2asc.put(x, asc);
+	  }
+	}
+	prevJ = j;
+	prevTCCol = tcCol;
+      }
+      edits = makeEditsForASCs(x2asc);
+    }
+    if (debugASC) System.err.println("returning " + edits.size() + " edits from autoSplitColumns");
     return edits;
   }
 

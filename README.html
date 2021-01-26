@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/01/21 21:33:54 $
+$Date: 2021/01/26 16:34:53 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -131,7 +131,7 @@ $Date: 2021/01/21 21:33:54 $
 <tr><td><img src="images/save-html.png"><br><code>Save html...</code></td><td>Saves the table data as an HTML <code>&lt;table&gt;</code>. Unlike the CSV format, this will preserve individually-merged cells (using <code>rowspan</code>/<code>colspan</code>), superscripts, and edited cell properties.</td><td>always</td><td><code>save-table</code></td></tr>
 <tr><td><img src="images/undo.png"><br><code>Undo</code></td><td>Moves backward in the edit history.</td><td>some edits have been done</td><td><code>undo</code></td></tr>
 <tr><td><img src="images/redo.png"><br><code>Redo</code></td><td>Moves forward in the edit history.</td><td>some edits remain undone, and no new edits have taken their place in the edit history</td><td><code>redo</code></td></tr>
-<tr><td><img src="images/auto-split-columns.png"><br><code>Auto-Split Columns</code></td><td>Attempts to split columns (as if by multiple <code>Split Column at X=<var>x</var></code> edits) automatically, and then re-merge some of the cells in those columns (as if by multiple <code>Merge Cells</code> edits), based on (partial) vertical ruling lines in the original document.</td><td>auto-split has not yet been done</td><td><code>auto-split-columns</code></td></tr>
+<tr><td><img src="images/auto-split-columns.png"><br><code>Auto-Split Columns</code></td><td>Attempts to split columns (as if by multiple <code>Split Column at X=<var>x</var></code> edits) automatically, and then re-merge some of the cells in those columns (as if by multiple <code>Merge Cells</code> edits). First tries to do so based on (partial) vertical ruling lines in the original document, then falls back to looking for gaps between columns in most of the rows.</td><td>auto-split has not yet been done</td><td><code>auto-split-columns</code></td></tr>
 <tr><td><img src="images/auto-merge-cells.png"><br><code>Auto-Merge Cells</code></td><td>Attempts to merge cells (as if by multiple <code>Merge Cells</code> edits) automatically, based on ruling lines and spacing in the original document.</td><td>auto-merge has not yet been done</td><td><code>auto-merge-cells</code></td></tr>
 <tr><td><img src="images/delete-rows.png"><br><code>Delete Rows</code></td><td>Deletes the selected rows.</td><td>some whole rows are selected<a href="#nm">*</a></td><td><code>delete-rows</code></td></tr>
 <tr><td><img src="images/delete-columns.png"><br><code>Delete Columns</code></td><td>Deletes the selected columns.</td><td>some whole columns are selected<a href="#nm">*</a></td><td><code>delete-columns</code></td></tr>
@@ -167,9 +167,13 @@ $Date: 2021/01/21 21:33:54 $
 
 <p>Usually in this situation, some of the cells (e.g. shared headings) should not be split. Use the <code>Merge Cells</code> or <code>Auto-Merge Cells</code> buttons to merge those cells again after splitting the column.</p>
 
-<p>If the original table has vertical ruling lines separating the columns, you can use the <code>Auto-Split Columns</code> button to do both steps (splitting columns and re-merging cells) for the whole table at once. Usually Tabula handles such ruled tables well, but it still fails to split columns when there is a single column heading spanning them; <code>Auto-Split Columns</code> helps with that case.</p>
+<p>If the original table has vertical ruling lines separating the columns, you can use the <code>Auto-Split Columns</code> button to do both steps (splitting columns and re-merging cells) for the whole table at once, based on those ruling lines. Usually Tabula handles such ruled tables well, but it still fails to split columns when there is a single column heading spanning them; <code>Auto-Split Columns</code> helps with that case.</p>
 
-<p>If the table has no vertical ruling lines, <code>Auto-Split Columns</code> should do nothing. However, it is possible that the PDF will appear to Tabula to have ruling lines that aren't actually visible as such when the page is finally displayed. In that case, <code>Auto-Split Columns</code> and <code>Auto-Merge Cells</code> (which also uses vertical and horizontal ruling lines) may appear to do strange things. Remember you may need to <code>Undo</code> multiple times to fully undo these <code>Auto-<var>*</var></code> edits.</p>
+<p>If <code>Auto-Split Columns</code> fails to split any columns using ruling lines, it falls back to a second mode where it instead looks for gaps between columns. These gaps serve a similar purpose to the vertical ruling lines, but they are less precise. Thus, finding the right line to split along can take longer and be more error-prone for such tables.</p>
+
+<p>If the table has no vertical ruling lines, the first pass of <code>Auto-Split Columns</code> should do nothing. However, it is possible that the PDF will appear to Tabula to have ruling lines that aren't actually visible as such when the page is finally displayed. In that case, <code>Auto-Split Columns</code> and <code>Auto-Merge Cells</code> (which also uses vertical and horizontal ruling lines) may appear to do strange things.</p>
+
+<p>Remember you may need to <code>Undo</code> multiple times to fully undo these <code>Auto-<var>*</var></code> edits.</p>
 
 <h3>Multi-page tables</h3>
 
@@ -544,7 +548,7 @@ $Date: 2021/01/21 21:33:54 $
   (request :content (auto-split-columns :table <var>table-ID</var>))
 </pre></code>
 
-<p>This will attempt to automatically detect and perform <code>split-column</code> edits, and then <code>merge-cells</code> edits for some of the cells that were split, on the given table. A vertical ruling that could split half of the cells in a column (or more) is used to split the column, and the cells that don't have a vertical ruling going through them at the same X coordinate are later re-merged.</p>
+<p>This will attempt to automatically detect and perform <code>split-column</code> edits, and then <code>merge-cells</code> edits for some of the cells that were split, on the given table. A vertical ruling or gap that could split half of the cells in a column (or more) is used to split the column, and the cells that don't have a vertical ruling or gap going through them at the same X coordinate are later re-merged.</p>
 
 <p>The reply to <code>auto-split-columns</code> is like those of <code>parse-table</code> and <code>edit-table</code>, except with an <code>:edits</code> argument (instead of <code>:edit</code>) listing the <code>split-column</code> and <code>merge-cells</code> edits that were performed, in order:</p>
 
