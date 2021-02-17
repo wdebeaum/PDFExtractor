@@ -1740,21 +1740,39 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
   }
 
-  /** Undo the last edit that was applied, and return it. */
-  public Edit undo() throws CWCException, BadEdit {
-    if (undoHistory.isEmpty())
-      throw new UnknownAction("undo");
-    Edit ed = undoHistory.remove(undoHistory.size()-1);
+  /** Undoable contains two versions of an edit that can be undone: one to
+   * remove from the undo history, and one to add to the redo history. They may
+   * be different because other edits come after it in the undo history,
+   * changing the row/col indices referenced in the edit. If the edit is undone
+   * and then redone, it will move to a different position in the undo history,
+   * so it might need different indices.
+   */
+  public class Undoable {
+    /** The version of the edit to remove from the undo history. */
+    public final Edit undo;
+    /** The version of the edit to add to the redo history. */
+    public final Edit redo;
+    public Undoable(Edit undo, Edit redo) {
+      this.undo = undo;
+      this.redo = redo;
+    }
+  }
+
+  /** Undo a specific edit from somewhere in the history. Only works properly
+   * in specific circumstances. Be careful using this.
+   */
+  public void undo(Undoable ed) throws CWCException, BadEdit {
+    undoHistory.remove(ed.undo);
     if (origin == null) { // synthetic table from KQML description
       // we know synthetic tables have no SplitColumn edits, so simply remove
       // the edit, reset to the original state, and redo all the other edits
-      history.remove(ed);
+      history.remove(ed.undo);
       resetRowsToOrigin();
       for (Edit e : history)
 	e.apply();
     } else { // real table extracted from a page with Tabula
-      if (ed instanceof SplitColumn) {
-	SplitColumn sc = (SplitColumn)ed;
+      if (ed.undo instanceof SplitColumn) {
+	SplitColumn sc = (SplitColumn)ed.undo;
 	splitColumns.remove(sc);
 	// undo some of what SplitColumn#apply() does
 	int newColIndex = colBoundXs.indexOf(sc.newColBoundX);
@@ -1765,7 +1783,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  newColIndex = newNewColIndex;
 	}
       } else {
-	history.remove(ed);
+	history.remove(ed.undo);
       }
       // rerun tabula (without first boundary because that would make a blank
       // column at the beginning)
@@ -1780,10 +1798,18 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	e.apply();
       }
     }
-    redoHistory.add(0, ed);
+    redoHistory.add(0, ed.redo);
     SwingUtilities.invokeLater(new Runnable() {
       @Override public void run() { fireTableStructureChanged(); }
     });
+  }
+
+  /** Undo the last edit that was applied, and return it. */
+  public Edit undo() throws CWCException, BadEdit {
+    if (undoHistory.isEmpty())
+      throw new UnknownAction("undo");
+    Edit ed = undoHistory.get(undoHistory.size()-1);
+    undo(new Undoable(ed, ed));
     return ed;
   }
   public boolean canUndo() { return !undoHistory.isEmpty(); }
@@ -2364,6 +2390,79 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	throw new BadEdit("ruling outside table bounds");
       return new MergeCells(start, pos, end, pos);
     }
+  }
+
+  /** If the cell at row,col was individually merged, and that can be undone,
+   * return the Undoable MergeCells edit that merged that cell; otherwise
+   * return null. The value returned from this function can be passed to
+   * undo().
+   */
+  public Undoable getUndoableMergeCellsAt(int row, int col) {
+    RectangularTextContainer cell = getCellAt(row, col);
+    if ((cell instanceof MergedCell) &&
+	Cell.wasMergedIndividually((MergedCell)cell)) {
+      // search backward through edit history for the relevant MergeCells
+      // edit (and keep track of oldRow/oldCol offsets implied by other edits)
+      MergeCells edit = null;
+      int oldRow = row, oldCol = col;
+      for (Iterator<Edit> i =
+	     ((LinkedList<Edit>)undoHistory).descendingIterator();
+           i.hasNext(); ) {
+	Edit e = i.next();
+	if (e instanceof MergeCells) {
+	  edit = (MergeCells)e;
+	  if (edit.firstRow == oldRow && edit.firstCol == oldCol) 
+	    break; // found it
+	  edit = null; // didn't find it yet
+	// adjust oldRow/oldCol when we look back past certain kinds of edit
+	} else if (e instanceof DeleteRows) {
+	  DeleteRows e2 = (DeleteRows)e;
+	  if (e2.firstRow <= oldRow)
+	    oldRow += e2.lastRow - e2.firstRow + 1;
+	} else if (e instanceof MergeRows) {
+	  MergeRows e2 = (MergeRows)e;
+	  if (e2.firstRow < oldRow)
+	    oldRow += e2.lastRow - e2.firstRow;
+	} else if (e instanceof DeleteColumns) {
+	  DeleteColumns e2 = (DeleteColumns)e;
+	  if (e2.firstCol <= oldCol)
+	    oldCol += e2.lastCol - e2.firstCol + 1;
+	} else if (e instanceof MergeColumns) {
+	  MergeColumns e2 = (MergeColumns)e;
+	  if (e2.firstCol < oldCol)
+	    oldCol += e2.lastCol - e2.firstCol;
+	// give up if the cell we're interested in was edited after being
+	// merged (this shouldn't really happen since then cell would be
+	// instanceof EditedCell instead of MergedCell, but whatever)
+	} else if (e instanceof EditCell) {
+	  EditCell e2 = (EditCell)e;
+	  if (e2.row == oldRow && e2.col == oldCol)
+	    break;
+	} else if (e instanceof EditCells) {
+	  EditCells e2 = (EditCells)e;
+	  if (e2.firstRow <= oldRow && oldRow <= e2.lastRow &&
+	      e2.firstCol <= oldCol && oldCol <= e2.lastCol)
+	    break;
+	} else {
+	  // other edit types are difficult or impossible to reach back
+	  // past, so don't try
+	  break;
+	}
+      }
+      if (edit == null)
+	return null;
+      MergeCells redoEdit =
+	new MergeCells(row, col,
+		       // NOTE: we can get away with computing lastRow/Col like
+		       // this instead of independently tracking them above
+		       // because any edits that would change them differently
+		       // would have been disallowed for involving an
+		       // individually-merged cell
+		       edit.lastRow + row - edit.firstRow,
+		       edit.lastCol + col - edit.firstCol);
+      return new Undoable(edit, redoEdit);
+    }
+    return null;
   }
 
   /** Select and reorder a subset of the rows of the table. */

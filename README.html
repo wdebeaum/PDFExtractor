@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/01/26 16:34:53 $
+$Date: 2021/01/27 21:18:18 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -138,6 +138,7 @@ $Date: 2021/01/26 16:34:53 $
 <tr><td><img src="images/merge-rows.png"><br><code>Merge Rows</code></td><td>Replaces the selected rows with a single row. In the new cells, the old rows will be separated by newlines.</td><td>multiple whole rows are selected<a href="#nm">*</a></td><td><code>merge-rows</code></td></tr>
 <tr><td><img src="images/merge-columns.png"><br><code>Merge Columns</code></td><td>Replaces the selected columns with a single column. In the new cells, the old columns will be separated by spaces where the amount of space in the original document warrants it.</td><td>multiple whole columns are selected<a href="#nm">*</a></td><td><code>merge-columns</code></td></tr>
 <tr><td><img src="images/merge-cells.png"><br><code>Merge Cells</code></td><td>Replace the selected cells with a single, individually-merged cell, while leaving the rest of the cells in the same rows or same columns separate.</td><td>multiple cells are selected<a href="#nm">*</a></td><td><code>merge-cells</code></td></tr>
+<tr><td><img src="images/undo-merge-cells.png"><br><code>Undo Merge Cells</code></td><td>Undo the <code>Merge Cells</code> edit that was performed to produce the selected cell. This can be a manual <code>Merge Cells</code>, or part of <code>Auto-Split Columns</code> or <code>Auto-Merge Cells</code>, and it need not have been the last edit done.</td><td>one individually-merged cell is selected, and other edits have not since been done that would complicate undoing the merger (any <code>Append rows of <var>table-ID</var></code> or <code>Split Column at X=<var>x</var></code> edits, or <code>Edit Cell(s)</code> of the merged cell)</td><td><code>(undo (merge-cells <var>...</var>))</code></td></tr>
 <tr><td><img src="images/merge-tables.png"><br><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window, and in the tooltip for this button) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
 <tr><td><img src="images/split-column.png"><br><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels). The <var>x</var> coordinate appears in the tooltip for this button.</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
 <tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
@@ -175,9 +176,11 @@ $Date: 2021/01/26 16:34:53 $
 
 <p>Remember you may need to <code>Undo</code> multiple times to fully undo these <code>Auto-<var>*</var></code> edits.</p>
 
+<p>The <code>Undo Merge Cells</code> button is particularly useful in the case where one of the <code>Auto-<var>*</code> buttons gets it almost right. Merged cells can get in the way of fixing what went wrong, by preventing most edits that touch them. You can get around that by un-merging those cells and then doing the other edits involving those cells. You can then merge them again afterward if necessary.</p>
+
 <h3>Multi-page tables</h3>
 
-<p>Sometimes a table will span multiple pages in the document. In that case, you should get a separate table from each page, and make sure they all end up with the same number of columns. After each page, starting with the second, you can go back to the table from the first page, and use the <code>Append rows of <var>table-ID</var></code> button to add the rows from the page you just did to the end of the table from the first page. The <var>table-ID</var> appears in the title of the table window, so you can tell which button to push if you have three or more table windows open.</p>
+<p>Sometimes a table will span multiple pages in the document. In that case, you should get a separate table from each page, and make sure they all end up with the same number of columns (LearningGUI/PDFLearn might help with this). After each page, starting with the second, you can go back to the table from the first page, and use the <code>Append rows of <var>table-ID</var></code> button to add the rows from the page you just did to the end of the table from the first page. The <var>table-ID</var> appears in the title of the table window and in the tooltip of the button, so you can tell which button to push if you have three or more table windows open.</p>
 
 <p>From the second page on, you may wish to omit the headings from the table, which are usually repeated for each page. You can do this one of two ways. One way is to manually select the table region in the document window so that it excludes the headings (the automatic <code>Detect Table</code> button will usually include the headings). Another way is to delete the heading rows from the table window, using the <code>Delete Rows</code> button. The first way has the advantage of avoiding the problem of certain spanning headings preventing Tabula from detecting column boundaries under them, so you don't need to split columns as much. When that problem doesn't exist, the second way is slightly easier.</p>
 
@@ -525,12 +528,14 @@ $Date: 2021/01/26 16:34:53 $
  <dt><code>(edit-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var><br> [ :annotations "<var>new-annotations</var>" ] [ :type <var>new-type</var> ])</code>
   <dd>Edit some of the properties of all of the cells in the specified rectangular region. Note that unlike <code>edit-cell</code>, this won't accept <code>:content</code> or <code>:heading-for</code> arguments.
  <dt><code>(undo)</code>
-  <dd>Moves backward in the edit history.
+  <dd>Moves backward in the edit history, undoing the most recently done edit.
  <dt><code>(redo)</code>
-  <dd>Moves forward in the edit history.
+  <dd>Moves forward in the edit history, redoing the most recently undone edit.
+ <dt><code>(undo (merge-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var>))</code>
+  <dd>Undoes the <code>merge-cells</code> edit that created a specific individually-merged cell, whether or not it was the most recent edit. This syntax currently only works for undoing <code>merge-cells</code> edits (not other types), and even for <code>merge-cells</code> it might fail because other edits that have happened since make it hard to undo properly. The <var>first-row-index</var> and <var>first-column-index</var> indicate the top left cell of the merged cell in the context of the current state of the table, not necessarily the state the table was in when the edit was originally made (so don't blindly feed a previously reported <code>merge-cells</code> edit to <code>undo</code>). It is not necessary to specify the last row/column.
 </dl>
 
-<p>The reply to <code>edit-table</code> request is in almost the same format as for the <code>parse-table</code> request, and includes the <code>:data</code> for the table after the edit was applied. It also includes an <code>:edit</code> argument which is the actual edit that was applied.</p>
+<p>The reply to the <code>edit-table</code> request is in almost the same format as for the <code>parse-table</code> request, and includes the <code>:data</code> for the table after the edit was applied. It also includes an <code>:edit</code> argument which is the actual edit that was applied.</p>
 
 <p>Many of these edits can be performed from the GUI by selecting some cells and clicking the corresponding button in the toolbar at the top of the table window. These will show up as buttons when the current selection allows them, e.g. select two or more columns with no individually-merged cells in them in order to make the <code>Merge Columns</code> button appear. Some edits depend on other factors; <code>merge-tables</code> appears as <code>Append rows of <var>table-ID</var></code> when <var>table-ID</var> has the same number of columns, and <code>split-column</code> appears as <code>Split column at X=<var>x</var></code> when a rectangle is selected whose minimum <var>x</var> coordinate could be used to divide a column. The <code>select-and-reorder-rows</code>/<code>columns</code> edits can't be done from the GUI.</p>
 

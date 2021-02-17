@@ -832,11 +832,46 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
     } else if (verb.equals("edit-table")) {
       KQMLToken tableID = Args.getTypedArgument(content, ":table", KQMLToken.class);
       Table table = HasID.get(tableID.toString(), Table.class);
-      KQMLPerformative editKQML = Args.getTypedArgument(content, ":edit", KQMLPerformative.class);
+      KQMLList editKQML =
+        Args.getTypedArgument(content, ":edit", KQMLList.class);
       try {
-	String editVerb = editKQML.getVerb().toLowerCase();
-	if (editVerb.equals("undo") || editVerb.equals("redo")) {
-	  int numArgs = editKQML.toList().size() - 1;
+	String editVerb = editKQML.get(0).toString().toLowerCase();
+	if (editVerb.equals("undo")) {
+	  int numArgs = editKQML.size() - 1;
+	  if (numArgs > 1) {
+	    KQMLPerformative reason =
+	      new KQMLPerformative("invalid-argument-count");
+	    reason.setParameter(":operator", editVerb);
+	    reason.setParameter(":expected", new KQMLString("0 or 1"));
+	    reason.setParameter(":got", Integer.toString(numArgs));
+	    throw new CWCException("failed-to-interpret", reason);
+	  }
+	  if (numArgs == 0) { // normal undo last edit
+	    Table.Edit edit = table.undo();
+	    editKQML = new KQMLList(new KQMLToken("undo"), edit.toKQML());
+	  } else { // 1 arg, undo merge-cells edit from somewhere in history
+	    KQMLPerformative mcKQML =
+	      Args.getTypedArgument(editKQML, 1, KQMLPerformative.class);
+	    if (!mcKQML.getVerb().equalsIgnoreCase("merge-cells"))
+	      throw new InvalidArgument(editKQML, 1, "merge-cells edit");
+	    int firstRow =
+	      Args.getTypedArgument(mcKQML, ":first-row", Integer.class);
+	    int firstCol =
+	      Args.getTypedArgument(mcKQML, ":first-column", Integer.class);
+	    if (firstRow < 0 || firstRow >= table.numRows)
+	      throw new InvalidArgument(mcKQML, ":first-row", "integer in [0," + table.numRows + ")");
+	    if (firstCol < 0 || firstCol >= table.numCols)
+	      throw new InvalidArgument(mcKQML, ":first-column", "integer in [0," + table.numCols + ")");
+	    Table.Undoable edit =
+	      table.getUndoableMergeCellsAt(firstRow, firstCol);
+	    // TODO? check :last-row/col matches if present in mcKQML
+	    if (edit == null)
+	      throw new InvalidArgument(editKQML, 1, "undoable merge-cells edit");
+	    table.undo(edit);
+	    editKQML = new KQMLList(new KQMLToken("undo"), edit.redo.toKQML());
+	  }
+	} else if (editVerb.equals("redo")) {
+	  int numArgs = editKQML.size() - 1;
 	  if (numArgs != 0) {
 	    KQMLPerformative reason =
 	      new KQMLPerformative("invalid-argument-count");
@@ -845,17 +880,10 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
 	    reason.setParameter(":got", Integer.toString(numArgs));
 	    throw new CWCException("failed-to-interpret", reason);
 	  }
-	  if (editVerb.equals("undo")) {
-	    Table.Edit edit = table.undo();
-	    editKQML = new KQMLPerformative("undo");
-	    // NOTE: using toList() like this is cheating a little
-	    editKQML.toList().add(edit.toKQML());
-	  } else {
-	    Table.Edit edit = table.redo();
-	    editKQML = (KQMLPerformative)edit.toKQML();
-	  }
+	  Table.Edit edit = table.redo();
+	  editKQML = ((KQMLPerformative)edit.toKQML()).toList();
 	} else { // plain edit
-	  Table.Edit edit = table.editFromKQML(editKQML);
+	  Table.Edit edit = table.editFromKQML(new KQMLPerformative(editKQML));
 	  table.edit(edit);
 	}
 	KQMLPerformative ans = new KQMLPerformative("answer");

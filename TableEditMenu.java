@@ -31,6 +31,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   SaveAction saveHTML;
   UndoRedoAction undoAction;
   UndoRedoAction redoAction;
+  UndoMergeCellsAction undoMergeCellsAction;
   AutoSplitColumnsAction autoSplitColumnsAction;
   AutoMergeCellsAction autoMergeCellsAction;
   List<JButton> mergeTablesButtons;
@@ -52,6 +53,10 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     redoAction = new UndoRedoAction(true);
     add(redoAction);
     redoAction.setEnabled(false);
+    undoMergeCellsAction = new UndoMergeCellsAction();
+    selectionModel.addListener(undoMergeCellsAction);
+    add(undoMergeCellsAction);
+    undoMergeCellsAction.setEnabled(false);
     if (table.origin == null) {
       autoSplitColumnsAction = null;
       autoMergeCellsAction = null;
@@ -220,6 +225,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   @Override public void tableChanged(TableModelEvent evt) {
     undoAction.setEnabled(table.canUndo());
     redoAction.setEnabled(table.canRedo());
+    undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
     updateSplitColumnActions();
     updateMergeTablesActions();
     revalidate();
@@ -365,5 +371,35 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 	module.reportEdit(table.redoHistory.get(0), true);
       }
     }
+  }
+
+  public class UndoMergeCellsAction extends ActionWithButton implements TableSelectionListener {
+    Table.Undoable edit;
+    public UndoMergeCellsAction() {
+      super("Undo Merge Cells", "undo-merge-cells");
+    }
+
+    @Override public void actionPerformed(ActionEvent evt) {
+      try {
+	table.undo(edit);
+      } catch (CWCException ex) {
+	throw new RuntimeException("edit failed unexpectedly", ex);
+      } catch (Table.BadEdit ex) {
+	throw new RuntimeException("edit failed unexpectedly", ex);
+      }
+      // NOTE: we report undoing the version of the edit to be added to the
+      // redo list, so that the row/col indices reflect the current state of
+      // the table
+      module.reportEdit(edit.redo, true);
+    }
+
+    //// TableSelectionListener ////
+
+    @Override public void valueChanged(TableSelection sel) {
+      if (sel.isOneCell())
+	edit = table.getUndoableMergeCellsAt(sel.firstRow, sel.firstCol);
+      setEnabled(edit != null);
+    }
+    @Override public void valueStoppedChanging(TableSelection sel) {}
   }
 }

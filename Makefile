@@ -4,6 +4,9 @@ TABULA_VERSION=1.0.2
 TABULA_JAR=tabula-$(TABULA_VERSION)-jar-with-dependencies.jar
 USES=TRIPS.TripsModule TRIPS.KQML TRIPS.util TRIPS.util.cwc $(TABULA_JAR:.jar=)
 JFLAGS=-cp $(CLASSPATH):$(TABULA_JAR):. -Xlint:unchecked
+ifeq ($(shell uname),Linux)
+EXTRA_JAVA_FLAGS=-Dsun.java2d.xrender=false
+endif
 
 SRCS=$(MAIN).java \
 	ActionWithButton.java \
@@ -101,6 +104,7 @@ CLASSES=$(SRCS:.java=.class) \
 	Table$$SelectColumns.class \
 	Table$$SelectRows.class \
 	Table$$SplitColumn.class \
+	Table$$Undoable.class \
 	TableEditMenu$$AutoMultiEditAction.class \
 	TableEditMenu$$AutoSplitColumnsAction.class \
 	TableEditMenu$$AutoMergeCellsAction.class \
@@ -109,6 +113,7 @@ CLASSES=$(SRCS:.java=.class) \
 	TableEditMenu$$SaveAction.class \
 	TableEditMenu$$SelectionEditAction.class \
 	TableEditMenu$$SplitColumnAction.class \
+	TableEditMenu$$UndoMergeCellsAction.class \
 	TableEditMenu$$UndoRedoAction.class \
 	TextChunker$$1.class \
 	TextMatch$$1.class \
@@ -134,7 +139,8 @@ XTRA = \
 	images/save-csv.png \
 	images/save-html.png \
 	images/split-column.png \
-	images/undo.png
+	images/undo.png \
+	images/undo-merge-cells.png
 
 all:: $(TABULA_JAR)
 
