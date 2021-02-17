@@ -2411,7 +2411,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	Edit e = i.next();
 	if (e instanceof MergeCells) {
 	  edit = (MergeCells)e;
-	  if (edit.firstRow == oldRow && edit.firstCol == oldCol) 
+	  if (edit.firstRow == oldRow && edit.firstCol == oldCol)
 	    break; // found it
 	  edit = null; // didn't find it yet
 	// adjust oldRow/oldCol when we look back past certain kinds of edit
@@ -2627,7 +2627,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       //int newColIndex = xCoordToColIndex(newColBoundX);
       int newColIndex;
       for (newColIndex = 0;
-           newColIndex < numCols && colBoundXs.get(newColIndex) <= newColBoundX;
+           newColIndex < colBoundXs.size() && colBoundXs.get(newColIndex) <= newColBoundX;
 	   newColIndex++)
 	;
       if (newColIndex == 0)
