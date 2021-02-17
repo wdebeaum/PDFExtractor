@@ -68,10 +68,18 @@ public class Page implements HasID, TextMatch.Searchable {
     // and the renderer uses the crop box instead of the "b" box
     PDRectangle cropBoxWithOffset = pdPage.getCropBox();
     // make a new version of the bounding box with the offset discarded
-    return new PDRectangle(
-      cropBoxWithOffset.getWidth(),
-      cropBoxWithOffset.getHeight()
-    );
+    int rotation = pdPage.getRotation(); // 0, 90, 180, or 270 degrees
+    if (rotation == 90 || rotation == 270) { // landscape, swap width/height
+      return new PDRectangle(
+	cropBoxWithOffset.getHeight(),
+	cropBoxWithOffset.getWidth()
+      );
+    } else {
+      return new PDRectangle(
+	cropBoxWithOffset.getWidth(),
+	cropBoxWithOffset.getHeight()
+      );
+    }
   }
 
   public PDPage getPDPage() { return pdPage; }
