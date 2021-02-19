@@ -77,6 +77,24 @@ public class HTMLBuilder {
       html("</sup>");
   }
 
+  public HTMLBuilder link(String rel, String type, String href) {
+    return
+      html("<link").
+      attr("rel", rel).
+      attr("type", type).
+      attr("href", href).
+      html(">\n");
+  }
+
+  public HTMLBuilder meta(String name, String content) {
+    if (content == null) return this;
+    return
+      html("<meta").
+      attr("name", name).
+      attr("content", content).
+      html(">\n");
+  }
+
   public HTMLBuilder beginTable() { return html("<table>"); }
   public HTMLBuilder endTable() { return html("</table>"); }
 

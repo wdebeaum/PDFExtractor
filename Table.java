@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -30,6 +31,7 @@ import javax.swing.JDialog;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.text.JTextComponent;
+import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import technology.tabula.HasText;
 import technology.tabula.RectangularTextContainer;
 import technology.tabula.Ruling;
@@ -42,6 +44,7 @@ import TRIPS.util.cwc.Args;
 import TRIPS.util.cwc.CWCException;
 import TRIPS.util.cwc.InvalidArgument;
 import TRIPS.util.cwc.UnknownAction;
+
 
 /** Improvement on Tabula's Table class: it has an ID, can be the model for a
  * JTable, and can be edited.
@@ -969,12 +972,37 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     out.endTable();
     out.script(annotationTemplateJS);
-    String meta =
-      (origin == null ? "" : (
-      "<link rel=\"original-document\" type=\"application/pdf\" href=\"file://" + origin.getPage().getDocument().getPDFFile().getAbsolutePath() + "\">\n" +
-      "<meta name=\"first-page-index\" content=\"" + origin.getPage().getPageIndex() + "\">\n" +
-      "<meta name=\"first-region-bbox\" content=\"" + origin.getMinX() + "," + origin.getMinY() + "," + origin.getAbsWidth() + "," + origin.getAbsHeight() + "\">\n"));
-    w.write(out.toProperDocumentString(id, meta));
+    String title = id;
+    HTMLBuilder meta = new HTMLBuilder();
+    if (origin != null) {
+      Page page = origin.getPage();
+      Document doc = page.getDocument();
+      PDDocumentInformation info = doc.getPDDocument().getDocumentInformation();
+      String pdfTitle = info.getTitle();
+      if (pdfTitle != null)
+	title = "table from page " + (page.getPageIndex() + 1) +
+		" of " + pdfTitle;
+      meta.
+	meta("generator", "PDFExtractor").
+        link("original-document", "application/pdf", "file://" + 
+	     doc.getPDFFile().getAbsolutePath()).
+	meta("first-page-index", ""+page.getPageIndex()).
+	meta("first-region-bbox",
+	     "" + origin.getMinX() + "," + origin.getMinY() + "," +
+	     origin.getAbsWidth() + "," + origin.getAbsHeight()).
+	meta("author", info.getAuthor()).
+	meta("description", info.getSubject()).
+	meta("keywords", info.getKeywords());
+      // creation/modification dates
+      // NOTE: converting to Instant before String ensures we use ISO format
+      Calendar created = info.getCreationDate();
+      if (created != null)
+	meta.meta("created", created.toInstant().toString());
+      Calendar modified = info.getModificationDate();
+      if (modified != null)
+	meta.meta("modified", modified.toInstant().toString());
+    }
+    w.write(out.toProperDocumentString(title, meta.toFragmentString()));
   }
 
   //// end writeHTML-related stuff ////
