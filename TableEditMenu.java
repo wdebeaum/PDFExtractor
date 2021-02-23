@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
@@ -225,7 +226,12 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   @Override public void tableChanged(TableModelEvent evt) {
     undoAction.setEnabled(table.canUndo());
     redoAction.setEnabled(table.canRedo());
-    undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
+    // FIXME?
+    // I'm not sure why I thought this was necessary. SpanTable also listens
+    // for tableChanged, and clears the selection, which fires valueChanged.
+    // Doing it here just means that undoMergeCellsAction sees the old
+    // selection on the new table, which can cause indexing errors.
+    //undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
     updateSplitColumnActions();
     updateMergeTablesActions();
     revalidate();
@@ -374,31 +380,54 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   }
 
   public class UndoMergeCellsAction extends ActionWithButton implements TableSelectionListener {
-    Table.Undoable edit;
+    List<Table.Undoable> edits;
     public UndoMergeCellsAction() {
       super("Undo Merge Cells", "undo-merge-cells");
+      edits = new ArrayList<Table.Undoable>();
     }
 
     @Override public void actionPerformed(ActionEvent evt) {
       try {
-	table.undo(edit);
+	table.undo(edits);
       } catch (CWCException ex) {
 	throw new RuntimeException("edit failed unexpectedly", ex);
       } catch (Table.BadEdit ex) {
 	throw new RuntimeException("edit failed unexpectedly", ex);
       }
-      // NOTE: we report undoing the version of the edit to be added to the
-      // redo list, so that the row/col indices reflect the current state of
-      // the table
-      module.reportEdit(edit.redo, true);
+      for (Table.Undoable edit : edits) {
+	// NOTE: we report undoing the version of the edit to be added to the
+	// redo list, so that the row/col indices reflect the current state of
+	// the table
+	module.reportEdit(edit.redo, true);
+      }
     }
 
     //// TableSelectionListener ////
 
     @Override public void valueChanged(TableSelection sel) {
-      if (sel.isOneCell())
-	edit = table.getUndoableMergeCellsAt(sel.firstRow, sel.firstCol);
-      setEnabled(edit != null);
+      edits.clear();
+      if (!sel.isEmpty()) {
+	// find all undoable merge cells edits in the selection
+	for (int row = sel.firstRow; row <= sel.lastRow; row++) {
+	  for (int col = sel.firstCol; col <= sel.lastCol; col++) {
+	    Table.Undoable edit = table.getUndoableMergeCellsAt(row, col);
+	    if (edit != null)
+	      edits.add(edit);
+	  }
+	}
+	// sort edits from latest to earliest in table.history, so that we undo
+	// them in the right order
+	edits.sort(new Comparator<Table.Undoable>() {
+	  @Override public int compare(Table.Undoable a, Table.Undoable b) {
+	    // NOTE: we know the edits are in the history, so these indexOf
+	    // calls never return -1
+	    int ai = table.history.indexOf(a.undo),
+	        bi = table.history.indexOf(b.undo);
+	    return Integer.compare(bi, ai);
+	  }
+	});
+      }
+      setEnabled(!edits.isEmpty());
     }
     @Override public void valueStoppedChanging(TableSelection sel) {}
   }

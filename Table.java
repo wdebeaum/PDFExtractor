@@ -1786,32 +1786,36 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
   }
 
-  /** Undo a specific edit from somewhere in the history. Only works properly
+  /** Undo specific edits from somewhere in the history. Only works properly
    * in specific circumstances. Be careful using this.
    */
-  public void undo(Undoable ed) throws CWCException, BadEdit {
-    undoHistory.remove(ed.undo);
+  public void undo(List<Undoable> edits) throws CWCException, BadEdit {
+    for (Undoable ed : edits)
+      undoHistory.remove(ed.undo);
     if (origin == null) { // synthetic table from KQML description
       // we know synthetic tables have no SplitColumn edits, so simply remove
-      // the edit, reset to the original state, and redo all the other edits
-      history.remove(ed.undo);
+      // the edits, reset to the original state, and redo all the other edits
+      for (Undoable ed : edits)
+	history.remove(ed.undo);
       resetRowsToOrigin();
       for (Edit e : history)
 	e.apply();
     } else { // real table extracted from a page with Tabula
-      if (ed.undo instanceof SplitColumn) {
-	SplitColumn sc = (SplitColumn)ed.undo;
-	splitColumns.remove(sc);
-	// undo some of what SplitColumn#apply() does
-	int newColIndex = colBoundXs.indexOf(sc.newColBoundX);
-	colBoundXs.remove(newColIndex);
-	for (Edit e : history) {
-	  int newNewColIndex = e.applyToColIndex(newColIndex);
-	  e.deleteColumn(newColIndex);
-	  newColIndex = newNewColIndex;
+      for (Undoable ed : edits) {
+	if (ed.undo instanceof SplitColumn) {
+	  SplitColumn sc = (SplitColumn)ed.undo;
+	  splitColumns.remove(sc);
+	  // undo some of what SplitColumn#apply() does
+	  int newColIndex = colBoundXs.indexOf(sc.newColBoundX);
+	  colBoundXs.remove(newColIndex);
+	  for (Edit e : history) {
+	    int newNewColIndex = e.applyToColIndex(newColIndex);
+	    e.deleteColumn(newColIndex);
+	    newColIndex = newNewColIndex;
+	  }
+	} else {
+	  history.remove(ed.undo);
 	}
-      } else {
-	history.remove(ed.undo);
       }
       // rerun tabula (without first boundary because that would make a blank
       // column at the beginning)
@@ -1826,10 +1830,20 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	e.apply();
       }
     }
-    redoHistory.add(0, ed.redo);
+    for (Undoable ed : edits)
+      redoHistory.add(0, ed.redo);
     SwingUtilities.invokeLater(new Runnable() {
       @Override public void run() { fireTableStructureChanged(); }
     });
+  }
+
+  /** Undo a single specific edit from somewhere in the history. Only works
+   * properly in specific circumstances. Be careful using this.
+   */
+  public void undo(Undoable ed) throws CWCException, BadEdit {
+    List<Undoable> edits = new ArrayList<Undoable>(1);
+    edits.add(ed);
+    undo(edits);
   }
 
   /** Undo the last edit that was applied, and return it. */

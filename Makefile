@@ -114,6 +114,7 @@ CLASSES=$(SRCS:.java=.class) \
 	TableEditMenu$$SelectionEditAction.class \
 	TableEditMenu$$SplitColumnAction.class \
 	TableEditMenu$$UndoMergeCellsAction.class \
+	TableEditMenu$$UndoMergeCellsAction$$1.class \
 	TableEditMenu$$UndoRedoAction.class \
 	TextChunker$$1.class \
 	TextMatch$$1.class \
