@@ -1,5 +1,6 @@
 package TRIPS.PDFExtractor;
 
+import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -11,6 +12,7 @@ import java.io.Writer;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -28,6 +30,8 @@ import java.util.regex.Pattern;
 import javax.swing.InputVerifier;
 import javax.swing.JFrame;
 import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.text.JTextComponent;
@@ -56,6 +60,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   // current state
   int numRows, numCols;
   List<List<RectangularTextContainer>> rows;
+  /** HTML caption, or null. */
+  String caption;
   /** Nontrivial Rulings in cell coordinates. */
   List<Ruling> rulings;
   // edit history
@@ -99,6 +105,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     redoHistory = new LinkedList<Edit>();
     this.id = HasID.getNextIDAndPut(this);
     setTabulaTable(tabulaTable);
+    caption = null;
     if (debugCellRegions) {
       // make a Region for each cell so they get highlighted
       for (List<RectangularTextContainer> row : rows) {
@@ -113,8 +120,9 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     this(extractTabulaTable(origin), origin);
   }
 
-  public Table(List<List<RectangularTextContainer>> originRows) {
+  public Table(List<List<RectangularTextContainer>> originRows, String caption) {
     this.originRows = originRows;
+    this.caption = caption;
     origin = null;
     resetRowsToOrigin();
     splitColumns = new LinkedList<SplitColumn>();
@@ -125,6 +133,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     colBoundXs = null;
     this.id = HasID.getNextIDAndPut(this);
   }
+
+  public String getCaption() { return caption; }
 
   @Override public int getRowCount() { return numRows; }
   @Override public int getColumnCount() { return numCols; }
@@ -149,6 +159,9 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       }
       rowsKQML.add(rowKQML);
     }
+    if (caption != null)
+      p.setParameter(":caption",
+          new KQMLString(HTMLBuilder.htmlToTextString(caption)));
     p.setParameter(":data", rowsKQML);
     KQMLList rulingsKQML = new KQMLList();
     for (Ruling ruling : rulings) {
@@ -189,6 +202,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
         Args.getTypedArgument(perf, ":id", KQMLToken.class, new KQMLToken("nil"));
       String id = idKQML.toString().toLowerCase();
       if (id.equals("nil")) { // have no ID, make a new table
+	String caption =
+	  Args.getTypedArgument(perf, ":caption", String.class, null);
 	KQMLList dataKQML =
 	  Args.getTypedArgument(perf, ":data", KQMLList.class);
 	// TODO? rulings
@@ -218,7 +233,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  }
 	  rows.add(row);
 	}
-	return new Table(rows);
+	return new Table(rows, caption);
       } else { // have ID, just get the existing object
 	return HasID.get(id, Table.class);
       }
@@ -874,6 +889,9 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     //// begin table output ////
     HTMLBuilder out = new HTMLBuilder();
     out.beginTable();
+    if (debugHTML) System.err.println("output caption if any");
+    if (caption != null)
+      out.html("<caption>" + caption + "</caption>");
     if (debugHTML) System.err.println("output col(group)s");
     // output <col> and <colgroup> elements
     for (int j = 0; j < numCols; j++) {
@@ -1746,9 +1764,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     try {
       ed.apply();
-      SwingUtilities.invokeLater(new Runnable() {
-	@Override public void run() { fireTableStructureChanged(); }
-      });
+      fireTableStructureChangedLater();
     } catch (CWCException ex) {
       // if applying the edit failed, remove it from the history and rethrow
       if (ed instanceof SplitColumn) {
@@ -1832,9 +1848,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     for (Undoable ed : edits)
       redoHistory.add(0, ed.redo);
-    SwingUtilities.invokeLater(new Runnable() {
-      @Override public void run() { fireTableStructureChanged(); }
-    });
+    fireTableStructureChangedLater();
   }
 
   /** Undo a single specific edit from somewhere in the history. Only works
@@ -1865,6 +1879,12 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     return ed;
   }
   public boolean canRedo() { return !redoHistory.isEmpty(); }
+
+  public void fireTableStructureChangedLater() {
+    SwingUtilities.invokeLater(new Runnable() {
+      @Override public void run() { fireTableStructureChanged(); }
+    });
+  }
 
   public static class BadEdit extends Exception {
     public BadEdit(String message) { super(message); }
@@ -1989,7 +2009,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     try {
       return (String)c.getField("kqmlVerb").get(null);
     } catch (ReflectiveOperationException ex) {
-      throw new RuntimeException("improperly defined Edit subclass", ex);
+      throw new RuntimeException("improperly defined Edit subclass " + c, ex);
     }
   }
 
@@ -2000,7 +2020,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     try {
       return (String)c.getField("buttonLabel").get(null);
     } catch (ReflectiveOperationException ex) {
-      throw new RuntimeException("improperly defined Edit subclass", ex);
+      throw new RuntimeException("improperly defined Edit subclass " + c, ex);
     }
   }
 
@@ -2009,7 +2029,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     if (editClasses == null) {
       editClasses = new ArrayList<Class<? extends Edit>>();
       for (Class<?> c : Table.class.getClasses()) {
-	if (c.getSuperclass() == Edit.class) {
+	if (Edit.class.isAssignableFrom(c) &&
+	    !Modifier.isAbstract(c.getModifiers())) {
 	  editClasses.add(c.asSubclass(Edit.class));
 	}
       }
@@ -2041,10 +2062,10 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  if (cause instanceof CWCException) {
 	    throw (CWCException)cause;
 	  } else { // fromKQML threw something it wasn't supposed to
-	    throw new RuntimeException("improperly defined Edit subclass", ex);
+	    throw new RuntimeException("improperly defined Edit subclass " + c, ex);
 	  }
 	} catch (ReflectiveOperationException ex) { // probably fromKQML undef.
-	  throw new RuntimeException("improperly defined Edit subclass", ex);
+	  throw new RuntimeException("improperly defined Edit subclass " + c, ex);
 	}
       }
     }
@@ -2727,28 +2748,39 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     throw new BadEdit("can't make a SplitColumn edit from a selection");
   }
 
+  /** A kind of Edit that can involve displaying a dialog window, and in that
+   * case does not immediately complete when apply() is called. Thus it needs
+   * access to the PDFExtractor module object in order to create the window,
+   * and report the edit when it closes. These edits can also be done via KQML,
+   * in which case they don't need the module object, and complete immediately.
+   */
+  public abstract class EditWithDialog extends Edit {
+    public PDFExtractor module;
+    public EditWithDialog() {
+      module = null;
+    }
+  }
+
   /** Edit the CellProperties of a cell (wrapping it in EditedCell if
    * necessary).
    */
-  public class EditCell extends Edit {
+  public class EditCell extends EditWithDialog {
     public final static String kqmlVerb = "edit-cell";
     public final static String buttonLabel = "Edit Cell";
     public final int row;
     public int col; // not final because SplitColumn might happen
     public CellProperties props;
-    public PDFExtractor module;
     public EditCell(int row, int col, CellProperties props) {
       this.row = row;
       this.col = col;
       this.props = props;
-      module = null;
     }
     public EditCell(int row, int col) { this(row, col, null); }
     @Override public void apply() throws CWCException, BadEdit {
       if (props == null) { // no properties yet, open a dialog to get them
 	if (module == null)
 	  throw new RuntimeException("expected module to be set in EditCell before apply() with props==null, but got module==null");
-	RectangularTextContainer cell = getCellAt(row, col);	
+	RectangularTextContainer cell = getCellAt(row, col);
 	CellProperties.Editor editor = Cell.getEditorOf(cell);
 	editor.setContext(Table.this, row, col, Cell.getSpanOf(cell));
 	props = editor.getProperties();
@@ -2836,20 +2868,18 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   /** Edit the CellProperties of multiple cells (wrapping them in EditedCells
    * if necessary).
    */
-  public class EditCells extends Edit {
+  public class EditCells extends EditWithDialog {
     public final static String kqmlVerb = "edit-cells";
     public final static String buttonLabel = "Edit Cells";
     public final int firstRow, lastRow;
     public int firstCol, lastCol; // not final because SplitColumn might happen
     public CellProperties props;
-    public PDFExtractor module;
     public EditCells(int firstRow, int firstCol, int lastRow, int lastCol, CellProperties props) {
       this.firstRow = firstRow;
       this.firstCol = firstCol;
       this.lastRow = lastRow;
       this.lastCol = lastCol;
       this.props = props;
-      module = null;
     }
     public EditCells(int firstRow, int firstCol, int lastRow, int lastCol) {
       this(firstRow, firstCol, lastRow, lastCol, null);
@@ -2954,6 +2984,72 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     if (sel.isEmpty() || sel.isOneCell())
       throw new BadEdit("expected more than one selected cell");
     return new EditCells(sel.firstRow, sel.firstCol, sel.lastRow, sel.lastCol);
+  }
+
+  /** Edit the caption of the table. */
+  public class EditCaption extends EditWithDialog {
+    public final static String kqmlVerb = "edit-caption";
+    public final static String buttonLabel = "Edit Caption";
+    public String newText;
+    public EditCaption(String newText) {
+      this.newText = newText;
+    }
+    public EditCaption() { this(null); }
+    @Override public void apply() throws CWCException, BadEdit {
+      if (newText == null) { // no caption yet, open a dialog to get it
+	if (module == null)
+	  throw new RuntimeException("expected module to be set in EditCaption before apply() with newText==null, but got module==null");
+	JFrame tableWindow = (JFrame)
+	  module.tableModel2view.get(Table.this).getTopLevelAncestor(); // ouch.
+	JDialog dialog =
+	  new JDialog(tableWindow, "edit caption of " + id, true);
+	JLabel label = new JLabel("Caption: ");
+	newText = ((Table.this.caption == null) ? "" :
+		    HTMLBuilder.htmlToTextString(Table.this.caption));
+	String oldText = newText;
+	int numLines = newText.split("\n").length;
+	JTextArea input =
+	  new JTextArea(newText, Math.max(2, numLines), 40);
+	// report this edit when the dialog closes
+	dialog.addWindowListener(new WindowAdapter() {
+	  @Override public void windowClosing(WindowEvent evt) {
+	    newText = input.getText();
+	    if (newText.equals(oldText)) { // no change, don't report edit
+	      return;
+	    } else if (newText.equals("")) { // empty, delete caption
+	      Table.this.caption = null;
+	    } else {
+	      Table.this.caption = HTMLBuilder.textToFragmentString(newText);
+	    }
+	    module.reportEdit(EditCaption.this, false);
+	    // the structure of the table didn't really change, but this makes
+	    // sure the display is updated
+	    fireTableStructureChanged();
+	  }
+	});
+	dialog.add(label, BorderLayout.WEST);
+	dialog.add(input);
+	dialog.pack();
+	dialog.setVisible(true);
+      } else {
+	Table.this.caption =
+	  (newText.equals("") ? null :
+	    HTMLBuilder.textToFragmentString(newText));
+      }
+    }
+    @Override public KQMLObject toKQML() {
+      KQMLPerformative p = new KQMLPerformative(kqmlVerb);
+      if (newText != null)
+	p.setParameter(":content", new KQMLString(newText));
+      return p;
+    }
+  }
+  public EditCaption editCaptionFromKQML(KQMLPerformative perf) throws CWCException {
+    String newText = Args.getTypedArgument(perf, ":content", String.class);
+    return new EditCaption(newText);
+  }
+  public EditCaption editCaptionFromSelection(TableSelection sel) throws BadEdit {
+    throw new BadEdit("can't make an EditCaption edit from a selection");
   }
 
   /* TODO?

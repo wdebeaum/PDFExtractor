@@ -86,17 +86,19 @@ CLASSES=$(SRCS:.java=.class) \
 	Region$$Source.class \
 	Table$$1.class \
 	Table$$2.class \
-	Table$$3.class \
 	Table$$AutoSplitColumn.class \
 	Table$$CellCoordinateComparator.class \
 	Table$$BadEdit.class \
 	Table$$DeleteColumns.class \
 	Table$$DeleteRows.class \
 	Table$$Edit.class \
+	Table$$EditCaption.class \
+	Table$$EditCaption$$1.class \
 	Table$$EditCell.class \
 	Table$$EditCell$$1.class \
 	Table$$EditCells.class \
 	Table$$EditCells$$1.class \
+	Table$$EditWithDialog.class \
 	Table$$MergeCells.class \
 	Table$$MergeColumns.class \
 	Table$$MergeRows.class \
@@ -109,6 +111,7 @@ CLASSES=$(SRCS:.java=.class) \
 	TableEditMenu$$AutoSplitColumnsAction.class \
 	TableEditMenu$$AutoMergeCellsAction.class \
 	TableEditMenu$$EditAction.class \
+	TableEditMenu$$EditCaptionAction.class \
 	TableEditMenu$$MergeTablesAction.class \
 	TableEditMenu$$SaveAction.class \
 	TableEditMenu$$SelectionEditAction.class \
@@ -130,6 +133,7 @@ XTRA = \
 	images/auto-split-columns.png \
 	images/delete-columns.png \
 	images/delete-rows.png \
+	images/edit-caption.png \
 	images/edit-cell.png \
 	images/edit-cells.png \
 	images/merge-cells.png \

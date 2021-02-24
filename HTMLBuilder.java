@@ -37,6 +37,14 @@ public class HTMLBuilder {
       );
   }
 
+  public static String htmlToTextString(String htmlString) {
+    return new HTMLBuilder().html(htmlString).toTextString();
+  }
+
+  public static String textToFragmentString(String textString) {
+    return new HTMLBuilder().textLines(textString).toFragmentString();
+  }
+
   public String toString() { return toDocumentString(); }
 
   public HTMLBuilder html(String html) {

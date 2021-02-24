@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/02/23 14:47:22 $
+$Date: 2021/02/24 19:49:37 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -141,8 +141,9 @@ $Date: 2021/02/23 14:47:22 $
 <tr><td><img src="images/undo-merge-cells.png"><br><code>Undo Merge Cells</code></td><td>Undo the <code>Merge Cells</code> edit that was performed to produce the selected cell. This can be a manual <code>Merge Cells</code>, or part of <code>Auto-Split Columns</code> or <code>Auto-Merge Cells</code>, and it need not have been the last edit done. If more than one cell is selected, each individually-merged cell in the selection that can be undone will be. If other cells also happen to be selected, they will be ignored.</td><td>at least one individually-merged cell is selected, such that other edits have not since been done that would complicate undoing the merger (any <code>Append rows of <var>table-ID</var></code> or <code>Split Column at X=<var>x</var></code> edits, or <code>Edit Cell(s)</code> of the merged cell)</td><td><code>(undo (merge-cells <var>...</var>))</code></td></tr>
 <tr><td><img src="images/merge-tables.png"><br><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window, and in the tooltip for this button) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
 <tr><td><img src="images/split-column.png"><br><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels). The <var>x</var> coordinate appears in the tooltip for this button.</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
-<tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
+<tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes. Double-clicking on a cell does the same thing as clicking this button.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
 <tr><td><img src="images/edit-cells.png"><br><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
+<tr><td><img src="images/edit-caption.png"><br><code>Edit Caption</code></td><td>Edit the caption that appears above the table. A window will appear with a text field to edit; the edit will take place when the window closes. Double-clicking an existing caption does the same thing as clicking this button.</td><td>always</td><td><code>edit-caption</code></td></tr>
 </table>
 <p><a name="nm">*</a> and the selection touches no individually-merged cells</p>
 
@@ -529,6 +530,8 @@ $Date: 2021/02/23 14:47:22 $
   <dd>Edit the properties of the cell at (<var>row-index</var>, <var>column-index</var>), replacing the values of any specified fields with the specified values, and replacing the values of the other fields with default values. Note that <var>new-type</var> should be a symbol (not a string), one of <code>data</code>, <code>row-heading</code>, or <code>column-heading</code>. Also note that <code>:heading-for</code> takes a string in the same format as the <code>Heading for cells</code> field in the GUI, e.g. <code>"B3-C45"</code>. The default <code>:content</code> is the original cell content from the document. The other defaults are <code>:annotations "" :type data :heading-for "N/A"</code>. But if <code>:type</code> is specified, <code>:heading-for</code> will default to an appropriate value for that type and the position of the cell in the table.
  <dt><code>(edit-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var><br> [ :annotations "<var>new-annotations</var>" ] [ :type <var>new-type</var> ])</code>
   <dd>Edit some of the properties of all of the cells in the specified rectangular region. Note that unlike <code>edit-cell</code>, this won't accept <code>:content</code> or <code>:heading-for</code> arguments.
+ <dt><code>(edit-caption :content "<var>new-content</var>")</code>
+  <dd>Edit the caption displayed above the table, replacing its contents with <var>new-content</var>. If empty, the caption won't be displayed, or included in saved HTML.
  <dt><code>(undo)</code>
   <dd>Moves backward in the edit history, undoing the most recently done edit.
  <dt><code>(redo)</code>

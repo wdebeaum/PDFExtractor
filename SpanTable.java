@@ -26,6 +26,7 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
   Table model;
   TableSelectionModel selectionModel;
   GridBagLayout layout;
+  JLabel caption;
   List<List<JLabel>> rows;
 
   public SpanTable(PDFExtractor module, Table model) {
@@ -64,10 +65,26 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
     rows = new ArrayList<List<JLabel>>(numRows);
     GridBagConstraints c = new GridBagConstraints();
     c.fill = GridBagConstraints.BOTH;
+    { // caption
+      c.gridx = 0;
+      c.gridy = 0;
+      c.gridwidth = numCols+1;
+      c.gridheight = 1;
+      String captionText = model.getCaption();
+      if (captionText == null) {
+	captionText = "";
+      } else {
+	captionText = "<html>" + captionText + "</html>";
+      }
+      caption =
+        makeCell(captionText, Color.WHITE, SwingConstants.CENTER, null);
+      layout.setConstraints(caption, c);
+      add(caption);
+    }
     // column headings
     for (int col = 0; col < numCols; col++) {
       c.gridx = col+1;
-      c.gridy = 0;
+      c.gridy = 1;
       c.gridwidth = 1;
       c.gridheight = 1;
       JLabel cell =
@@ -80,7 +97,7 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
     for (int row = 0; row < numRows; row++) {
       { // row heading
 	c.gridx = 0;
-	c.gridy = row+1;
+	c.gridy = row+2;
 	c.gridwidth = 1;
 	c.gridheight = 1;
 	JLabel cell =
@@ -93,7 +110,7 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
       rows.add(cells);
       for (int col = 0; col < numCols; col++) {
 	c.gridx = col+1;
-	c.gridy = row+1;
+	c.gridy = row+2;
 	String cellText = (String)model.getValueAt(row, col);
 	Dimension cellSpan = model.getSpanAt(row, col);
 	c.gridwidth = cellSpan.width;
@@ -178,13 +195,19 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
   //// MouseListener ////
   
   @Override public void mouseClicked(MouseEvent evt) {
-    // if this is a double-click on a cell...
+    // if this is a double-click
     if (SwingUtilities.isLeftMouseButton(evt) &&
         evt.getClickCount() == 2) {
-      TableSelection sel = new TableSelection(selectionModel);
+      GridBagConstraints c = layout.getConstraints(evt.getComponent());
+      Table.EditWithDialog ed = null;
+      if (c.gridy == 0) // on a caption
+	ed = model.new EditCaption();
       try {
-	// ... do an EditCell edit
-	Table.EditCell ed = model.editCellFromSelection(sel);
+	if (ed == null) { // on a cell? (throw if not)
+	  TableSelection sel = new TableSelection(selectionModel);
+	  ed = model.editCellFromSelection(sel);
+	}
+	// do the edit (i.e. put up the dialog)
 	ed.module = module;
 	model.edit(ed);
       } catch (Table.BadEdit ex) {
@@ -197,7 +220,7 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 
   @Override public void mouseEntered(MouseEvent evt) {
     GridBagConstraints c = layout.getConstraints(evt.getComponent());
-    selectionModel.setLead(c.gridy > 0 ? c.gridy - 1 : 0,
+    selectionModel.setLead(c.gridy > 1 ? c.gridy - 2 : 0,
 			   c.gridx > 0 ? c.gridx - 1 : 0);
   }
 
@@ -205,15 +228,17 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 
   @Override public void mousePressed(MouseEvent evt) {
     GridBagConstraints c = layout.getConstraints(evt.getComponent());
-    if (c.gridx == 0) { // row heading
+    if (c.gridy == 0) { // caption
+      // ignore
+    } else if (c.gridx == 0) { // row heading
       selectionModel.setAdjusting(true, false);
-      selectionModel.setSelection(c.gridy-1, 0, c.gridy-1, -1);
-    } else if (c.gridy == 0) { // column heading
+      selectionModel.setSelection(c.gridy-2, 0, c.gridy-2, -1);
+    } else if (c.gridy == 1) { // column heading
       selectionModel.setAdjusting(false, true);
       selectionModel.setSelection(0, c.gridx-1, -1, c.gridx-1);
     } else { // cell
       selectionModel.setAdjusting(true, true);
-      selectionModel.setAnchorAndLead(c.gridy-1, c.gridx-1);
+      selectionModel.setAnchorAndLead(c.gridy-2, c.gridx-1);
     }
   }
 

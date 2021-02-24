@@ -35,6 +35,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   UndoMergeCellsAction undoMergeCellsAction;
   AutoSplitColumnsAction autoSplitColumnsAction;
   AutoMergeCellsAction autoMergeCellsAction;
+  EditCaptionAction editCaptionAction;
   List<JButton> mergeTablesButtons;
   List<JButton> splitColumnButtons;
 
@@ -67,6 +68,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
       autoMergeCellsAction = new AutoMergeCellsAction();
       add(autoMergeCellsAction);
     }
+    editCaptionAction = new EditCaptionAction();
+    add(editCaptionAction);
     for (Class<? extends Table.Edit> c : Table.getEditClasses()) {
       SelectionEditAction a = new SelectionEditAction(c);
       selectionModel.addListener(a);
@@ -84,7 +87,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     table.addTableModelListener(this); // table isn't displayed yet, but will be
     if (table.origin != null)
       table.origin.getPage().addPageListener(this);
-    setPreferredSize(new Dimension(44*14+22+2, 46)); // enough room for 14.5 buttons
+    setPreferredSize(new Dimension(44*15+22+2, 46)); // enough room for 15.5 buttons
   }
 
   // when adding an action that keeps its button, add the button to the action
@@ -108,13 +111,11 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     @Override public void actionPerformed(ActionEvent evt) {
       // save the edit to be done, since doing it may cause us to set edit=null
       Table.Edit savedEdit = edit;
-      // if it's an EditCell(s), tell it about the module so it can report the
-      // edit when the user closes the editor dialog it creates (also so that
-      // it can find the window it's in, so it can own the editor dialog)
-      if (edit instanceof Table.EditCell)
-	((Table.EditCell)edit).module = module;
-      if (edit instanceof Table.EditCells)
-	((Table.EditCells)edit).module = module;
+      // if it's an EditWithDialog, tell it about the module so it can report
+      // the edit when the user closes the editor dialog it creates (also so
+      // that it can find the window it's in, so it can own the editor dialog)
+      if (edit instanceof Table.EditWithDialog)
+	((Table.EditWithDialog)edit).module = module;
       try {
 	table.edit(edit);
       } catch (CWCException ex) {
@@ -122,9 +123,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
       } catch (Table.BadEdit ex) {
 	throw new RuntimeException("edit failed unexpectedly", ex);
       }
-      // if it's not an EditCell(s), we report it ourselves
-      if (!((savedEdit instanceof Table.EditCell) ||
-	    (savedEdit instanceof Table.EditCells)))
+      // if it's not an EditWithDialog, we report it ourselves
+      if (!(savedEdit instanceof Table.EditWithDialog))
 	module.reportEdit(savedEdit, false);
     }
   }
@@ -147,7 +147,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 	editFromSelection =
 	  Table.class.getMethod(fromSelectionName, TableSelection.class);
       } catch (ReflectiveOperationException ex) {
-	throw new RuntimeException("improperly defined Edit subclass", ex);
+	throw new RuntimeException("improperly defined Edit subclass " + c, ex);
       }
     }
 
@@ -160,7 +160,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 	edit = null;
       } catch (ReflectiveOperationException ex) {
 	edit = null;
-	throw new RuntimeException("improperly defined Edit subclass", ex);
+	throw new RuntimeException("improperly defined Edit subclass " + editClass, ex);
       } finally {
 	setEnabled(edit != null);
       }
@@ -169,6 +169,20 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   }
 
   //// EditActions with other arguments ////
+  
+  public class EditCaptionAction extends EditAction {
+    public EditCaptionAction() {
+      super(Table.EditCaption.buttonLabel, Table.EditCaption.kqmlVerb);
+      edit = table.new EditCaption();
+    }
+    @Override public void actionPerformed(ActionEvent evt) {
+      super.actionPerformed(evt);
+      // performing the action fills in the caption in the edit, and saves the
+      // edit in the undo history, so in order to be able to perform the action
+      // again, we need a new, blank instance of the edit to do
+      edit = table.new EditCaption();
+    }
+  }
 
   public class MergeTablesAction extends EditAction {
     public MergeTablesAction(Table other) throws Table.BadEdit {
