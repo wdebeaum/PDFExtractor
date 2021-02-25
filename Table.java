@@ -2034,12 +2034,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  editClasses.add(c.asSubclass(Edit.class));
 	}
       }
-      // reverse (java, y u no have ArrayList#reverse()?)
-      for (int i = 0, j = editClasses.size() - 1; i < j; i++, j--) {
-	Class<? extends Edit> tmp = editClasses.get(i);
-	editClasses.set(i, editClasses.get(j));
-	editClasses.set(j, tmp);
-      }
+      Collections.reverse(editClasses);
     }
     return editClasses;
   }
@@ -2506,6 +2501,9 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  if (e2.firstRow <= oldRow && oldRow <= e2.lastRow &&
 	      e2.firstCol <= oldCol && oldCol <= e2.lastCol)
 	    break;
+	} else if ((e instanceof EditCaption) ||
+	           (e instanceof AddCaption)) {
+	  // ignore (captions don't interact with the rest of the table)
 	} else {
 	  // other edit types are difficult or impossible to reach back
 	  // past, so don't try
@@ -3050,6 +3048,58 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   }
   public EditCaption editCaptionFromSelection(TableSelection sel) throws BadEdit {
     throw new BadEdit("can't make an EditCaption edit from a selection");
+  }
+
+  /** Add a caption from another page region. */
+  public class AddCaption extends Edit {
+    public final static String kqmlVerb = "add-caption";
+    public final static String buttonLabel = "Add Caption";
+    public final Region origin;
+    public final String content;
+    public AddCaption(Region origin) {
+      this.origin = origin;
+      this.content = Cell.getHTMLOf(origin).toFragmentString();
+    }
+    @Override public void apply() throws CWCException, BadEdit {
+      Table.this.caption = content;
+    }
+    @Override public KQMLObject toKQML() {
+      KQMLPerformative p = new KQMLPerformative(kqmlVerb);
+      p.setParameter(":origin", origin.toKQML());
+      return p;
+    }
+    public String getButtonLabel() {
+      HTMLBuilder out = new HTMLBuilder();
+      out.text(buttonLabel).text(": ");
+      if (content.length() > 34) { // too long, replace rest with elipsis
+	int end = 30;
+	// avoid cutting through any <sup></sup> or <br/> tags
+	int supIndex = content.lastIndexOf("<sup>", end+5);
+	int endSupIndex = content.lastIndexOf("</sup>", end+6);
+	if (supIndex > endSupIndex || end-6 < endSupIndex)
+	  end = supIndex;
+	int brIndex = content.lastIndexOf("<br/>", end+5);
+	if (end-5 < brIndex && brIndex < end)
+	  end = brIndex;
+	out.html(content.substring(0, end)).text(" ...");
+      } else {
+	out.html(content);
+      }
+      return out.toDocumentString();
+    }
+  }
+  public AddCaption addCaptionFromKQML(KQMLPerformative perf) throws CWCException {
+    KQMLObject originKQML =
+      Args.getTypedArgument(perf, ":origin", KQMLObject.class);
+    try {
+      Region origin = Region.fromKQML(originKQML);
+      return new AddCaption(origin);
+    } catch (KQMLBadPerformativeException ex) {
+      throw new InvalidArgument(perf, ":origin", "region ID or description");
+    }
+  }
+  public AddCaption addCaptionFromSelection(TableSelection sel) throws BadEdit {
+    throw new BadEdit("can't make an AddCaption edit from a table selection");
   }
 
   /* TODO?

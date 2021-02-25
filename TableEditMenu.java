@@ -38,6 +38,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   EditCaptionAction editCaptionAction;
   List<JButton> mergeTablesButtons;
   List<JButton> splitColumnButtons;
+  List<JButton> addCaptionButtons;
 
   public TableEditMenu(PDFExtractor module, Table table, TableSelectionModel selectionModel) {
     super();
@@ -81,6 +82,8 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     updateMergeTablesActions();
     splitColumnButtons = new ArrayList<JButton>();
     updateSplitColumnActions();
+    addCaptionButtons = new ArrayList<JButton>();
+    //updateAddCaptionActions(); // there shouldn't be any yet
     for (Table other : module.getDisplayedTables()) {
       other.addTableModelListener(this);
     }
@@ -236,22 +239,6 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     }
   }
 
-  // TableModelListener
-  @Override public void tableChanged(TableModelEvent evt) {
-    undoAction.setEnabled(table.canUndo());
-    redoAction.setEnabled(table.canRedo());
-    // FIXME?
-    // I'm not sure why I thought this was necessary. SpanTable also listens
-    // for tableChanged, and clears the selection, which fires valueChanged.
-    // Doing it here just means that undoMergeCellsAction sees the old
-    // selection on the new table, which can cause indexing errors.
-    //undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
-    updateSplitColumnActions();
-    updateMergeTablesActions();
-    revalidate();
-    repaint();
-  }
-
   public class SplitColumnAction extends EditAction {
     public SplitColumnAction(float newColBoundX) throws Table.BadEdit {
       super("Split column at X=" + newColBoundX, "split-column");
@@ -293,11 +280,75 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
       }
     }
   }
+  
+  public class AddCaptionAction extends EditAction {
+    public AddCaptionAction(Table.AddCaption edit) {
+      super(edit.getButtonLabel(), Table.AddCaption.kqmlVerb);
+      this.edit = edit;
+    }
+    // disable after performing the action once (doesn't make sense to do it
+    // twice in a row)
+    @Override public void actionPerformed(ActionEvent evt) {
+      super.actionPerformed(evt);
+      setEnabled(false);
+    }
+  }
+
+  void updateAddCaptionActions() {
+    for (JButton b : addCaptionButtons) { remove(b); }
+    addCaptionButtons.clear();
+    if (table.origin == null)
+      return;
+    // any region the user selected after the table origin region is a
+    // potential caption; make a button for it
+    List<Region> regions = table.origin.getPage().getRegions();
+    boolean afterTableOrigin = false;
+    synchronized (regions) {
+      for (Region r : regions) {
+	if (r == table.origin) {
+	  afterTableOrigin = true;
+	} else if (afterTableOrigin && r.source == Region.Source.USER) {
+	  // check that we didn't just add this caption
+	  boolean found = false;
+	  for (Table.Edit h : table.history) {
+	    if (h instanceof Table.AddCaption) {
+	      if (((Table.AddCaption)h).origin == r)
+		found = true;
+	      break;
+	    } else if (h instanceof Table.EditCaption) {
+	      break;
+	    }
+	  }
+	  if (found) continue; // this is already the caption
+	  Table.AddCaption edit = table.new AddCaption(r);
+	  AddCaptionAction action = new AddCaptionAction(edit);
+	  addCaptionButtons.add(add(action));
+	}
+      }
+    }
+  }
+
+  // TableModelListener
+  @Override public void tableChanged(TableModelEvent evt) {
+    undoAction.setEnabled(table.canUndo());
+    redoAction.setEnabled(table.canRedo());
+    // FIXME?
+    // I'm not sure why I thought this was necessary. SpanTable also listens
+    // for tableChanged, and clears the selection, which fires valueChanged.
+    // Doing it here just means that undoMergeCellsAction sees the old
+    // selection on the new table, which can cause indexing errors.
+    //undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
+    updateSplitColumnActions();
+    updateMergeTablesActions();
+    revalidate();
+    repaint();
+  }
 
   // Page.Listener
   @Override public void pageChanged(Page.Event evt) {
     if (evt.getType() == Page.Event.Type.REGION_STOPPED_CHANGING) {
       updateSplitColumnActions();
+      updateAddCaptionActions();
       revalidate();
       repaint();
     }

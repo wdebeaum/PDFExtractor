@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/02/24 19:49:37 $
+$Date: 2021/02/25 16:13:17 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -144,6 +144,7 @@ $Date: 2021/02/24 19:49:37 $
 <tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes. Double-clicking on a cell does the same thing as clicking this button.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
 <tr><td><img src="images/edit-cells.png"><br><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
 <tr><td><img src="images/edit-caption.png"><br><code>Edit Caption</code></td><td>Edit the caption that appears above the table. A window will appear with a text field to edit; the edit will take place when the window closes. Double-clicking an existing caption does the same thing as clicking this button.</td><td>always</td><td><code>edit-caption</code></td></tr>
+<tr><td><img src="images/add-caption.png"><br><code>Add Caption: <var>caption</var>...</code></td><td>Use the content of a region you selected as the caption. The first part of this content appears in the tooltip.</td><td>a region was selected in the document window on the same page as the table, after the table was selected, and it is not currently used as the caption</td><td><code>add-caption</code></td></tr>
 </table>
 <p><a name="nm">*</a> and the selection touches no individually-merged cells</p>
 
@@ -532,6 +533,8 @@ $Date: 2021/02/24 19:49:37 $
   <dd>Edit some of the properties of all of the cells in the specified rectangular region. Note that unlike <code>edit-cell</code>, this won't accept <code>:content</code> or <code>:heading-for</code> arguments.
  <dt><code>(edit-caption :content "<var>new-content</var>")</code>
   <dd>Edit the caption displayed above the table, replacing its contents with <var>new-content</var>. If empty, the caption won't be displayed, or included in saved HTML.
+ <dt><code>(add-caption :origin <var>region</var>)</code>
+  <dd>Add a caption (or replace the existing one) using the content of <var>region</var>, which can be the ID of an existing region, or the description of a new region.
  <dt><code>(undo)</code>
   <dd>Moves backward in the edit history, undoing the most recently done edit.
  <dt><code>(redo)</code>
@@ -667,13 +670,13 @@ $Date: 2021/02/24 19:49:37 $
      ))
 </pre></code>
 
-<p>This will answer with the text or HTML (by default text) content of a region detected with <code>detect-paragraph-regions</code>, or of a single table cell:</p>
+<p>This will answer with the text or HTML (by default text) content of a region (such as one detected with <code>detect-paragraph-regions</code>, or manually selected), or of a single table cell:</p>
 
 <code><pre>
   (reply :content (report :content (answer :content "<var>text-or-html-content</var>")))
 </pre></code>
 
-<p>It will not work on other kinds of region, like manually-selected ones or detected table regions. And it will not work (yet) on whole tables, selections of multiple table cells, documents, or pages.</p>
+<p>It will not work (yet) on whole tables, selections of multiple table cells, documents, or pages.</p>
 
 <p>When <code>:format "text/html"</code> is supplied, the content will be an HTML fragment, with superscripts annotated with <code>&lt;sup&gt;</code> elements, and <code>&lt;br/&gt;</code> for line breaks.</p>
 

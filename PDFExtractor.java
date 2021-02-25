@@ -666,27 +666,23 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
     } else if (verb.equals("get-content")) {
       KQMLObject of = content.getParameter(":of");
       String format = Args.getTypedArgument(content, ":format", String.class, "text/plain").toLowerCase();
-      RectangularTextContainer rtc = null;
+      Object ofObj = null;
       if (of instanceof KQMLToken) {
-	Region region = HasID.get(of.toString(), Region.class);
-	if (region.rect instanceof RectangularTextContainer)
-	  rtc = (RectangularTextContainer)region.rect;
+	ofObj = HasID.get(of.toString(), Region.class);
       } else if (of instanceof KQMLList &&
                  ((KQMLList)of).size() > 1 &&
 		 ((KQMLList)of).get(0) instanceof KQMLToken &&
 		 ((KQMLList)of).get(0).toString().equalsIgnoreCase("cell")) {
 	TableSelection cs = TableSelection.fromKQML(of);
-	rtc = cs.table.getCellAt(cs.firstRow, cs.firstCol);
+	ofObj = cs.table.getCellAt(cs.firstRow, cs.firstCol);
       } else {
 	throw new InvalidArgument(content, ":of", "region ID or table cell");
       }
       String contentStr;
-      if (rtc == null) {
-	contentStr = "";
-      } else if (format.equals("text/plain")) {
-	contentStr = Cell.getTextOf(rtc);
+      if (format.equals("text/plain")) {
+	contentStr = Cell.getTextOf(ofObj);
       } else if (format.equals("text/html")) {
-	HTMLBuilder html = Cell.getHTMLOf(rtc);
+	HTMLBuilder html = Cell.getHTMLOf(ofObj);
 	contentStr = html.toFragmentString();
       } else {
 	throw new InvalidArgument(content, ":format", "text/plain or text/html");

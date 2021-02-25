@@ -15,6 +15,7 @@ SRCS=$(MAIN).java \
 	Document.java \
 	DocumentMenu.java \
 	EditedCell.java \
+	HasHTML.java \
 	HasID.java \
 	HasSortOrders.java \
 	HelpButton.java \
@@ -75,6 +76,7 @@ CLASSES=$(SRCS:.java=.class) \
 	PDFExtractor$$6.class \
 	PDFPane$$Listener.class \
 	Region$$1.class \
+	Region$$2.class \
 	Region$$Coord.class \
 	Region$$NamedColor.class \
 	Region$$Order.class \
@@ -86,6 +88,7 @@ CLASSES=$(SRCS:.java=.class) \
 	Region$$Source.class \
 	Table$$1.class \
 	Table$$2.class \
+	Table$$AddCaption.class \
 	Table$$AutoSplitColumn.class \
 	Table$$CellCoordinateComparator.class \
 	Table$$BadEdit.class \
@@ -107,6 +110,7 @@ CLASSES=$(SRCS:.java=.class) \
 	Table$$SelectRows.class \
 	Table$$SplitColumn.class \
 	Table$$Undoable.class \
+	TableEditMenu$$AddCaptionAction.class \
 	TableEditMenu$$AutoMultiEditAction.class \
 	TableEditMenu$$AutoSplitColumnsAction.class \
 	TableEditMenu$$AutoMergeCellsAction.class \
@@ -129,6 +133,7 @@ CLASSES=$(SRCS:.java=.class) \
 
 XTRA = \
 	README.html \
+	images/add-caption.png \
 	images/auto-merge-cells.png \
 	images/auto-split-columns.png \
 	images/delete-columns.png \

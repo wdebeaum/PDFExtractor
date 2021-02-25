@@ -2,6 +2,7 @@ package TRIPS.PDFExtractor;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Map;
@@ -12,8 +13,11 @@ import java.awt.Graphics;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 //import technology.tabula.Page; conflicts
+import technology.tabula.HasText;
 import technology.tabula.Rectangle;
 import technology.tabula.RectangularTextContainer;
+import technology.tabula.TextChunk;
+import technology.tabula.TextElement;
 import TRIPS.KQML.KQMLBadPerformativeException;
 import TRIPS.KQML.KQMLObject;
 import TRIPS.KQML.KQMLList;
@@ -27,7 +31,7 @@ import TRIPS.util.cwc.UnknownObject;
 
 /** Represents a rectangular region of a {@link Page} in a PDF {@link Document}.
  */
-public class Region implements HasID, TextMatch.Searchable, HasSortOrders<Region> {
+public class Region implements HasID, HasHTML, TextMatch.Searchable, HasSortOrders<Region> {
   final String id;
   @Override public String getID() { return id; }
   Rectangle rect;
@@ -95,12 +99,35 @@ public class Region implements HasID, TextMatch.Searchable, HasSortOrders<Region
   public Color getColor() { return color; }
   public void setColor(Color c) { color = c; }
 
+  @Override
   public String getText() {
     if (rect instanceof RectangularTextContainer) {
       return ((RectangularTextContainer)rect).getText();
     } else {
-      return ""; // TODO?
+      // TODO maybe just do this, since it would still apply to RTCs?
+      return getHTML(new HTMLBuilder()).toTextString();
     }
+  }
+
+  @Override
+  public HTMLBuilder getHTML(HTMLBuilder out) {
+    // get TextElements within rect
+    List<TextElement> textElements = toTabulaPage().getText();
+    // group textElements into lines using TextChunker
+    TextChunker tc = new TextChunker();
+    tc.coordIsX = false;
+    tc.addAll(textElements);
+    List<TextChunk> lines = tc.chunk();
+    // sort by increasing center Y coordinate
+    Collections.sort(lines, new Comparator<TextChunk>() {
+      @Override public int compare(TextChunk a, TextChunk b) {
+	return Double.compare(a.getCenterY(), b.getCenterY());
+      }
+    });
+    // output each line followed by <br>
+    for (TextChunk line : lines)
+      Cell.getHTMLOf(line, out).br();
+    return out;
   }
 
   /** Rearrange coordinates to get rid of any negative width or height. */

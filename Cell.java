@@ -19,7 +19,7 @@ import technology.tabula.TextElement;
  * whether it is a Cell or something else (usually a TextChunk).  Javadoc is
  * provided only for the non-Of version.
  */
-public abstract class Cell extends RectangularTextContainer<TextElement> implements HasText {
+public abstract class Cell extends RectangularTextContainer<TextElement> implements HasHTML {
   public Cell(float top, float left, float width, float height) {
     super(top, left, width, height);
   }
@@ -64,32 +64,26 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
     return text.replaceAll("\\s", " ");
   }
 
-  /** Append the HTML representation of this cell to the given HTMLBuilder, and
-   * return it.
-   */
-  public abstract HTMLBuilder getHTML(HTMLBuilder out);
   public HTMLBuilder getHTML() { return getHTML(new HTMLBuilder()); }
 
   public static HTMLBuilder getHTMLOf(Object o, HTMLBuilder out) {
-    if (o instanceof Cell) {
-      ((Cell)o).getHTML(out);
-    } else {
-      if (o instanceof TextChunk) {
-	// detect superscripts and turn them into <sup>
-	TextChunk chunk = (TextChunk)o;
-	TextElement prev = null;
-	for (TextElement element : chunk.getTextElements()) {
-	  String text = getTextOf(element);
-	  if (prev != null && isSuperscript(prev, element)) {
-	    out.sup(text);
-	  } else {
-	    out.text(text);
-	  }
-	  prev = element;
+    if (o instanceof HasHTML) {
+      ((HasHTML)o).getHTML(out);
+    } else if (o instanceof TextChunk) {
+      // detect superscripts and turn them into <sup>
+      TextChunk chunk = (TextChunk)o;
+      TextElement prev = null;
+      for (TextElement element : chunk.getTextElements()) {
+	String text = getTextOf(element);
+	if (prev != null && isSuperscript(prev, element)) {
+	  out.sup(text);
+	} else {
+	  out.text(text);
 	}
-      } else {
-	out.text(getTextOf(o));
+	prev = element;
       }
+    } else {
+      out.text(getTextOf(o)); // TODO? use textLines() instead of text()
     }
     return out;
   }
