@@ -135,9 +135,9 @@ public class HTMLBuilder {
 
   public HTMLBuilder script(String content) {
     return
-      html("<script type=\"text/javascript\">\n").
+      html("<script type=\"text/javascript\">\n<!--\n").
       html(content). // NOTE: escaping not necessary
-      html("\n</script>");
+      html("\n-->\n</script>");
   }
 
   public static String escape(String text) {

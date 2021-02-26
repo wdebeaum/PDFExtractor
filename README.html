@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/02/25 16:13:17 $
+$Date: 2021/02/26 14:46:53 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -210,7 +210,7 @@ $Date: 2021/02/25 16:13:17 $
 
 <p>Note that if a cell contains line breaks (as a vertically-merged cell would) and you import it from CSV in Excel, for example, you might only see the first line displayed in the cell, and that first line might be blank. You can delete the line breaks or resize the row that the cell is in, in order to see the cell contents better.</p>
 
-<p>Excel can also import HTML tables, which reportedly work better. PDFExtractor does include some JavaScript code related to tooltips in the HTML, and Excel includes the code at the end of the table instead of running it. Just ignore it or delete it.</p>
+<p>Excel can also import HTML tables, which reportedly work better.</p>
 
 <p>PDFExtractor may also include metadata in the <code>&lt;head&gt;</code> element of the HTML file (in <code>&lt;title&gt;</code>, <code>&lt;link&gt;</code>, and <code>&lt;meta&gt;</code> tags). These are derived from the PDF document the table was extracted from, and the table's relationship to it. In particular, the <code>&lt;meta&gt;</code> tags <code>author</code>, <code>description</code>, <code>keywords</code>, <code>created</code>, and <code>modified</code> are pulled from the PDF file, and apply to it, not the table.</p>
 
