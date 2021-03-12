@@ -4,8 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
-import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.Writer;
@@ -19,6 +19,7 @@ import java.util.BitSet;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,12 +28,16 @@ import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import javax.swing.DefaultListModel;
 import javax.swing.InputVerifier;
 import javax.swing.JFrame;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
+import javax.swing.ListModel;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ListSelectionEvent;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.text.JTextComponent;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
@@ -60,8 +65,10 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   // current state
   int numRows, numCols;
   List<List<RectangularTextContainer>> rows;
-  /** HTML caption, or null. */
-  String caption;
+  /** Caption, or null. */
+  Cell caption;
+  /** Footnotes. */
+  DefaultListModel<Cell> footnotes;
   /** Nontrivial Rulings in cell coordinates. */
   List<Ruling> rulings;
   // edit history
@@ -81,12 +88,16 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
    * because then it would make an extra blank column at the beginning.
    */
   List<Float> colBoundXs;
+  /** Original caption a synthetic table was made with, or null. */
+  String originalCaption;
+  /** Original footnotes a synthetic table was made with, or empty list. */
+  List<String> originalFootnotes;
   /** The manually-added column boundaries only. */
   List<SplitColumn> splitColumns;
   /** All edits applied to this table, in order, except SplitColumn edits.
    * splitColumns apply before running Tabula.
    */
-  List<Edit> history;
+  LinkedList<Edit> history;
   /** All edits applied to this table, in order, including SplitColumn edits.
    * We need this too in order to implement Undo properly.
    */
@@ -99,6 +110,9 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public Table(technology.tabula.Table tabulaTable, Region origin) {
     this.origin = origin;
     originRows = null;
+    originalCaption = null;
+    originalFootnotes = new ArrayList<String>();
+    footnotes = new DefaultListModel<Cell>();
     splitColumns = new LinkedList<SplitColumn>();
     history = new LinkedList<Edit>();
     undoHistory = new LinkedList<Edit>();
@@ -120,11 +134,13 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     this(extractTabulaTable(origin), origin);
   }
 
-  public Table(List<List<RectangularTextContainer>> originRows, String caption) {
+  public Table(List<List<RectangularTextContainer>> originRows, String captionStr, List<String> footnoteStrs) {
     this.originRows = originRows;
-    this.caption = caption;
+    originalCaption = captionStr;
+    originalFootnotes = footnoteStrs;
+    footnotes = new DefaultListModel<Cell>();
     origin = null;
-    resetRowsToOrigin();
+    resetToOrigin();
     splitColumns = new LinkedList<SplitColumn>();
     history = new LinkedList<Edit>();
     undoHistory = new LinkedList<Edit>();
@@ -134,7 +150,8 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     this.id = HasID.getNextIDAndPut(this);
   }
 
-  public String getCaption() { return caption; }
+  public Cell getCaption() { return caption; }
+  public ListModel<Cell> getFootnotes() { return footnotes; }
 
   @Override public int getRowCount() { return numRows; }
   @Override public int getColumnCount() { return numCols; }
@@ -160,14 +177,21 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       rowsKQML.add(rowKQML);
     }
     if (caption != null)
-      p.setParameter(":caption",
-          new KQMLString(HTMLBuilder.htmlToTextString(caption)));
+      p.setParameter(":caption", new KQMLString(caption.getText()));
     p.setParameter(":data", rowsKQML);
     KQMLList rulingsKQML = new KQMLList();
     for (Ruling ruling : rulings) {
       rulingsKQML.add(rulingToKQML(ruling));
     }
     p.setParameter(":rulings", rulingsKQML);
+    KQMLList footnotesKQML = new KQMLList();
+    for (Enumeration<Cell> fnEnum = footnotes.elements();
+         fnEnum.hasMoreElements();
+	 ) {
+      Cell footnote = fnEnum.nextElement();
+      footnotesKQML.add(new KQMLString(footnote.getText()));
+    }
+    p.setParameter(":footnotes", footnotesKQML);
     return p;
   }
 
@@ -202,10 +226,15 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
         Args.getTypedArgument(perf, ":id", KQMLToken.class, new KQMLToken("nil"));
       String id = idKQML.toString().toLowerCase();
       if (id.equals("nil")) { // have no ID, make a new table
-	String caption =
+	String captionStr =
 	  Args.getTypedArgument(perf, ":caption", String.class, null);
 	KQMLList dataKQML =
 	  Args.getTypedArgument(perf, ":data", KQMLList.class);
+	KQMLList footnotesKQML =
+	  Args.getTypedArgument(perf, ":footnotes", KQMLList.class, new KQMLList());
+	List<String> footnoteStrs = new ArrayList<String>(footnotesKQML.size());
+	for (KQMLObject footnoteKQML : footnotesKQML)
+	  footnoteStrs.add(footnoteKQML.stringValue());
 	// TODO? rulings
 	int numRows = dataKQML.size();
 	if (numRows == 0)
@@ -233,7 +262,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  }
 	  rows.add(row);
 	}
-	return new Table(rows, caption);
+	return new Table(rows, captionStr, footnoteStrs);
       } else { // have ID, just get the existing object
 	return HasID.get(id, Table.class);
       }
@@ -260,6 +289,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       }
       i++;
     }
+    // TODO? also search caption/footnotes?
     return matchesHere;
   }
 
@@ -724,8 +754,42 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     "      cell.title = cell.title.replace(vr, hText);",
     "    }",
     "  }",
+    "}",
+    "var origDocLink = document.querySelector('link[rel=original-document]');",
+    "if (null !== origDocLink) {",
+    "  document.body.insertAdjacentHTML('beforeend', '<h2>Provenance</h2>');",
+    "  var origDocA = document.createElement('a');",
+    "  origDocA.href = origDocLink.href;",
+    "  origDocA.textContent = 'original document';",
+    "  document.body.appendChild(origDocA);",
+    "  var provTable = document.createElement('table');",
+    "  document.body.appendChild(provTable);",
+    "  ['first-page-index', 'first-region-bbox'].forEach(function(n) {",
+    "    provTable.insertAdjacentHTML('beforeend', '<tr><th>' + n + '</th><td>' + document.querySelector('meta[name=' + n + ']').content + '</td></tr>');",
+    "  });",
+    "  document.body.insertAdjacentHTML('beforeend', '<h2>Original document metadata</h2>');",
+    "  var metaTable = document.createElement('table');",
+    "  document.body.appendChild(metaTable);",
+    "  'author description keywords created modified'.split(' ').forEach(function(n) {",
+    "    var meta = document.querySelector('meta[name=' + n + ']');",
+    "    if (null !== meta) {",
+    "      var tr = document.createElement('tr');",
+    "      var th = document.createElement('th');",
+    "      th.textContent = n;",
+    "      tr.appendChild(th);",
+    "      var td = document.createElement('td');",
+    "      td.textContent = meta.content;",
+    "      tr.appendChild(td);",
+    "      metaTable.appendChild(tr);",
+    "    }",
+    "  });",
     "}"
   );
+
+  /** Escape '\' and '"' in str by preceding them with backslashes. */
+  static String escapeForQuote(String str) {
+    return str.replaceAll("([\\\\\"])", "\\\\$1");
+  }
 
   /** Write the table data in HTML format using the given writer. */
   public void writeHTML(Writer w) throws IOException {
@@ -890,8 +954,20 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     HTMLBuilder out = new HTMLBuilder();
     out.beginTable();
     if (debugHTML) System.err.println("output caption if any");
-    if (caption != null)
-      out.html("<caption>" + caption + "</caption>");
+    String captionJS = "";
+    if (caption != null) {
+      // inserting the <caption> element now would make it show up when
+      // importing into a spreadsheet program, which we don't want
+      //out.html("<caption>" + caption.getHTML().toFragmentString() + "</caption>");
+      // instead, insert it when the script is run, which only happens in the
+      // browser, not the spreadsheet
+      String captionHTML = caption.getHTML().toFragmentString();
+      String captionTitle = "";
+      String captionTTT = caption.getProperties().getToolTipText();
+      if (captionTTT != null)
+	captionTitle = " title=\""+HTMLBuilder.escapeAttrVal(captionTTT)+"\"";
+      captionJS = "document.getElementsByTagName('table')[0].insertAdjacentHTML('afterbegin', \"<caption" + escapeForQuote(captionTitle) + ">" + escapeForQuote(captionHTML) + "</caption>\");\n";
+    }
     if (debugHTML) System.err.println("output col(group)s");
     // output <col> and <colgroup> elements
     for (int j = 0; j < numCols; j++) {
@@ -989,9 +1065,34 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       i++;
     }
     out.endTable();
-    out.script(annotationTemplateJS);
+    // like captions, we don't want footnotes to show up in spreadsheet import,
+    // so we insert them in JS in the browser
+    String footnotesJS = "";
+    if (!footnotes.isEmpty()) {
+      StringBuilder footnotesStr = new StringBuilder();
+      for (Enumeration<Cell> fnEnum = footnotes.elements();
+	   fnEnum.hasMoreElements();
+	   ) {
+	Cell footnote = fnEnum.nextElement();
+	footnotesStr.append("<p");
+	String tooltip = footnote.getProperties().getToolTipText();
+	if (tooltip != null) {
+	  footnotesStr.
+	    append(" title=\"").
+	    append(HTMLBuilder.escapeAttrVal(tooltip)).
+	    append("\"");
+	}
+	footnotesStr.
+	  append(">").
+	  append(footnote.getHTML().toFragmentString()).
+	  append("</p>");
+      }
+      footnotesJS = "document.getElementsByTagName('table')[0].insertAdjacentHTML('afterend', \"" + escapeForQuote(footnotesStr.toString()) + "\");\n";
+    }
+    out.script(captionJS + footnotesJS + annotationTemplateJS);
     String title = id;
     HTMLBuilder meta = new HTMLBuilder();
+    meta.meta("generator", "PDFExtractor");
     if (origin != null) {
       Page page = origin.getPage();
       Document doc = page.getDocument();
@@ -1001,7 +1102,6 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	title = "table from page " + (page.getPageIndex() + 1) +
 		" of " + pdfTitle;
       meta.
-	meta("generator", "PDFExtractor").
         link("original-document", "application/pdf", "file://" + 
 	     doc.getPDFFile().getAbsolutePath()).
 	meta("first-page-index", ""+page.getPageIndex()).
@@ -1169,6 +1269,18 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     rulings = cellRulings;
   }
 
+  /** Reset the caption and footnotes to their original state. */
+  public void resetToOriginalNotes() {
+    caption =
+      (originalCaption == null ? null : new SyntheticCell(originalCaption));
+    footnotes.clear();
+    for (String fn : originalFootnotes)
+      footnotes.addElement(new SyntheticCell(fn));
+  }
+
+  /** Set the table's state to use the new table from tabula, and the original
+   * values for other state (caption and footnotes).
+   */
   public void setTabulaTable(technology.tabula.Table tabulaTable) {
     numRows = tabulaTable.getRowCount();
     numCols = tabulaTable.getColCount();
@@ -1177,15 +1289,20 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     if (colBoundXs == null) {
       computeColBoundXs();
     }
+    resetToOriginalNotes();
   }
 
-  public void resetRowsToOrigin() {
+  /** Reset the table to its original state, as stored in originRows,
+   * originalCaption, and originalFootnotes.
+   */
+  public void resetToOrigin() {
     numRows = originRows.size();
     numCols = originRows.get(0).size();
     // copy originRows into rows
     rows = new ArrayList<List<RectangularTextContainer>>(numRows);
     for (int i = 0; i < numRows; i++)
       rows.add(new ArrayList<RectangularTextContainer>(originRows.get(i)));
+    resetToOriginalNotes();
   }
 
   public static technology.tabula.Table extractTabulaTable(Region region, List<Float> colBoundXs) {
@@ -1813,7 +1930,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       // the edits, reset to the original state, and redo all the other edits
       for (Undoable ed : edits)
 	history.remove(ed.undo);
-      resetRowsToOrigin();
+      resetToOrigin();
       for (Edit e : history)
 	e.apply();
     } else { // real table extracted from a page with Tabula
@@ -1891,6 +2008,12 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 
     public void rethrowAsInvalidArgument(KQMLPerformative editTable) throws InvalidArgument {
       throw new InvalidArgument(editTable, ":edit", getMessage());
+    }
+  }
+
+  public static class RegionAlreadyUsed extends BadEdit {
+    public RegionAlreadyUsed(Region r) {
+      super(r.getID() + " was already used for this edit");
     }
   }
 
@@ -1994,13 +2117,31 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     public abstract KQMLObject toKQML();
     /** Return the table this edit was created for. */
     public Table getTable() { return Table.this; }
+    /** Return the label to use for the button to apply this edit instance.
+     * Defaults to returning the buttonLabel static final field, but is
+     * overridden in edits made from Region selections to provide more specific
+     * information related to the Region.
+     */
+    public String getButtonLabel() {
+      return Table.getButtonLabel(this.getClass());
+    }
     // Edit subclasses E must also define these static fields:
     // public final static String kqmlVerb;
     // public final static String buttonLabel;
+    // public final static int fromSelectionType;
     // ...and these methods in Table:
     // public E eFromKQML(KQMLPerformative) throws CWCException;
-    // public E eFromSelection(TableSelection) throws BadEdit;
+    // public E eFromSelection(fromSelectionClass) throws BadEdit;
+    // (if fromSelectionType != NONE, where fromSelectionClass=getFromSelectionClass(E.class))
   }
+
+  // the following constants really ought to be this:
+  //public static enum SelectionType { NONE, CELLS, FOOTNOTE, REGION };
+  // but java won't let me use these values for inner class' constants :(
+  public static final int SELECTION_TYPE_NONE = 0;
+  public static final int SELECTION_TYPE_CELLS = 1;
+  public static final int SELECTION_TYPE_FOOTNOTE = 2;
+  public static final int SELECTION_TYPE_REGION = 3;
 
   /** Return the verb of a KQMLPerformative that represents an instance of
    * the given Edit subclass.
@@ -2024,19 +2165,66 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
   }
 
+  /** Return the type of selection to be passed to cFromSelection() for the
+   * given Edit subclass c.
+   */
+  public static Class getFromSelectionClass(Class<? extends Edit> c) {
+    try {
+      int st =
+        (int)c.getField("fromSelectionType").get(null);
+      switch (st) {
+	case SELECTION_TYPE_NONE:	return null;
+	case SELECTION_TYPE_CELLS:	return TableSelection.class;
+	case SELECTION_TYPE_FOOTNOTE:	return ListSelectionEvent.class;
+	case SELECTION_TYPE_REGION:	return Region.class;
+	default: throw new RuntimeException("improperly defined Edit subclass " + c + " has fromSelectionType=" + st + " not in [0,4)");
+      }
+    } catch (ReflectiveOperationException ex) {
+      throw new RuntimeException("improperly defined Edit subclass " + c, ex);
+    }
+  }
+
   private static List<Class<? extends Edit>> editClasses;
-  public static List<Class<? extends Edit>> getEditClasses() {
+  private static List<Method> editFromRegionMethods;
+  private static synchronized void ensureEditMetadata() {
     if (editClasses == null) {
       editClasses = new ArrayList<Class<? extends Edit>>();
+      editFromRegionMethods = new ArrayList<Method>();
       for (Class<?> c : Table.class.getClasses()) {
 	if (Edit.class.isAssignableFrom(c) &&
 	    !Modifier.isAbstract(c.getModifiers())) {
-	  editClasses.add(c.asSubclass(Edit.class));
+	  Class<? extends Edit> editClass = c.asSubclass(Edit.class);
+	  editClasses.add(editClass);
+	  Class fromSelectionClass =
+	    Table.getFromSelectionClass(editClass);
+	  if (fromSelectionClass == Region.class) {
+	    String className = editClass.getSimpleName();
+	    String fromSelectionName =
+	      className.substring(0,1).toLowerCase() +
+	      className.substring(1) +
+	      "FromSelection";
+	    try {
+	      editFromRegionMethods.add(
+		Table.class.getMethod(fromSelectionName, fromSelectionClass));
+	    } catch (NoSuchMethodException ex) {
+	      throw new RuntimeException("improperly defined Edit subclass " + editClass, ex);      
+	    }
+	  }
 	}
       }
       Collections.reverse(editClasses);
+      Collections.reverse(editFromRegionMethods);
     }
+  }
+
+  public static List<Class<? extends Edit>> getEditClasses() {
+    ensureEditMetadata();
     return editClasses;
+  }
+
+  public static List<Method> getEditFromRegionMethods() {
+    ensureEditMetadata();
+    return editFromRegionMethods;
   }
 
   public Edit editFromKQML(KQMLPerformative perf) throws CWCException {
@@ -2071,6 +2259,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class MergeTables extends Edit {
     public final static String kqmlVerb = "merge-tables";
     public final static String buttonLabel = "Merge Tables";
+    public final static int fromSelectionType = SELECTION_TYPE_NONE;
     public final List<Table> others;
     public MergeTables(List<Table> others) { this.others = others; }
     @Override public void apply() throws CWCException, BadEdit {
@@ -2081,6 +2270,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       }
       for (Table other : others) {
 	// copy the other table's rows
+	// FIXME? editing these copied cells in one table might also edit them in the other table (also applies to footnotes)
 	for (List<RectangularTextContainer> otherRow : other.rows) {
 	  List<RectangularTextContainer> newRow =
 	    new ArrayList<RectangularTextContainer>(otherRow);
@@ -2095,6 +2285,13 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	  rulings.add(newRuling);
 	}
 	numRows += other.numRows;
+	// copy the other table's footnotes (but not caption)
+	for (Enumeration<Cell> fnEnum = other.footnotes.elements();
+	     fnEnum.hasMoreElements();
+	     ) {
+	  Cell otherFootnote = fnEnum.nextElement();
+	  footnotes.addElement(otherFootnote);
+	}
       }
     }
     @Override public KQMLObject toKQML() {
@@ -2118,14 +2315,12 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     return new MergeTables(tables);
   }
-  public MergeTables mergeTablesFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make a MergeTables edit from a selection");
-  }
 
   /** Delete all rows from firstRow to lastRow. */
   public class DeleteRows extends Edit {
     public final static String kqmlVerb = "delete-rows";
     public final static String buttonLabel = "Delete Rows";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public final int firstRow, lastRow;
     public DeleteRows(int firstRow, int lastRow) {
       this.firstRow = firstRow;
@@ -2164,6 +2359,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class DeleteColumns extends Edit {
     public final static String kqmlVerb = "delete-columns";
     public final static String buttonLabel = "Delete Columns";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public int firstCol, lastCol; // not final because SplitColumn might happen
     public DeleteColumns(int firstCol, int lastCol) {
       this.firstCol = firstCol;
@@ -2224,6 +2420,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class MergeRows extends Edit {
     public final static String kqmlVerb = "merge-rows";
     public final static String buttonLabel = "Merge Rows";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public final int firstRow, lastRow;
     public MergeRows(int firstRow, int lastRow) {
       this.firstRow = firstRow;
@@ -2278,6 +2475,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class MergeColumns extends Edit {
     public final static String kqmlVerb = "merge-columns";
     public final static String buttonLabel = "Merge Columns";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public int firstCol, lastCol; // not final because SplitColumn might happen
     public MergeColumns(int firstCol, int lastCol) {
       this.firstCol = firstCol;
@@ -2344,6 +2542,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class MergeCells extends Edit {
     public final static String kqmlVerb = "merge-cells";
     public final static String buttonLabel = "Merge Cells";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public final int firstRow, lastRow;
     public int firstCol, lastCol; // not final because SplitColumn might happen
     public MergeCells(int firstRow, int firstCol, int lastRow, int lastCol) {
@@ -2502,8 +2701,11 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
 	      e2.firstCol <= oldCol && oldCol <= e2.lastCol)
 	    break;
 	} else if ((e instanceof EditCaption) ||
-	           (e instanceof AddCaption)) {
-	  // ignore (captions don't interact with the rest of the table)
+	           (e instanceof AddCaption) ||
+		   (e instanceof EditFootnote) ||
+		   (e instanceof AddFootnote) ||
+		   (e instanceof DeleteFootnote)) {
+	  // ignore (notes don't interact with the rest of the table)
 	} else {
 	  // other edit types are difficult or impossible to reach back
 	  // past, so don't try
@@ -2530,6 +2732,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class SelectRows extends Edit {
     public final static String kqmlVerb = "select-and-reorder-rows";
     public final static String buttonLabel = "Keep Rows";
+    public final static int fromSelectionType = SELECTION_TYPE_NONE;
     public final List<Integer> selectedRows;
     public SelectRows(List<Integer> selectedRows) {
       this.selectedRows = selectedRows;
@@ -2589,14 +2792,12 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     return new SelectRows(rowIndices);
   }
-  public SelectRows selectRowsFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make a SelectRows edit from a selection");
-  }
 
   /** Select and reorder a subset of the columns of the table. */
   public class SelectColumns extends Edit {
     public final static String kqmlVerb = "select-and-reorder-colunms";
     public final static String buttonLabel = "Keep Columns";
+    public final static int fromSelectionType = SELECTION_TYPE_NONE;
     public final List<Integer> selectedCols;
     public SelectColumns(List<Integer> selectedCols) {
       this.selectedCols = selectedCols;
@@ -2661,9 +2862,6 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
     }
     return new SelectColumns(colIndices);
   }
-  public SelectColumns selectColumnsFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make a SelectColumns edit from a selection");
-  }
 
   /** Split a column by adding a new column boundary at X coordinate
    * newColBoundX before running Tabula.
@@ -2671,6 +2869,7 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class SplitColumn extends Edit {
     public final static String kqmlVerb = "split-column";
     public final static String buttonLabel = "Split Column";
+    public final static int fromSelectionType = SELECTION_TYPE_REGION;
     public final float newColBoundX;
     public SplitColumn(float newColBoundX) { this.newColBoundX = newColBoundX;}
     @Override public void apply() throws CWCException, BadEdit {
@@ -2736,27 +2935,94 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       p.setParameter(":at-x", Float.toString(newColBoundX));
       return p;
     }
+    @Override public String getButtonLabel() {
+      return "Split column at X=" + newColBoundX;
+    }
   }
   public SplitColumn splitColumnFromKQML(KQMLPerformative perf) throws CWCException {
     // NOTE: Double because Args doesn't do Float
     double newColBoundX = Args.getTypedArgument(perf, ":at-x", Double.class);
     return new SplitColumn((float)newColBoundX);
   }
-  public SplitColumn splitColumnFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make a SplitColumn edit from a selection");
+  public SplitColumn splitColumnFromSelection(Region sel) throws BadEdit {
+    float newColBoundX = (float)sel.getMinX();
+    double minX = origin.getMinX();
+    double maxX = origin.getMaxX();
+    if (newColBoundX <= minX || newColBoundX >= maxX) {
+      throw new BadEdit("new column boundary is outside the table");
+    }
+    for (Float cbx : colBoundXs) {
+      if (newColBoundX == (float)cbx)
+	throw new RegionAlreadyUsed(sel); // not quite, but OK
+    }
+    for (Table.Edit e : history) {
+      if (e instanceof Table.MergeTables) {
+        throw new BadEdit("split-column conflicts with merge-tables already in edit history");
+      }
+    }
+    return new SplitColumn(newColBoundX);
   }
 
-  /** A kind of Edit that can involve displaying a dialog window, and in that
-   * case does not immediately complete when apply() is called. Thus it needs
-   * access to the PDFExtractor module object in order to create the window,
-   * and report the edit when it closes. These edits can also be done via KQML,
-   * in which case they don't need the module object, and complete immediately.
+  /** A kind of Edit that can involve displaying a CellProperties.Editor dialog
+   * window, and in that case does not immediately complete when apply() is
+   * called. Thus it needs access to the PDFExtractor module object in order to
+   * create the window, and report the edit when it closes. These edits can
+   * also be done via KQML, in which case they don't need the module object,
+   * and complete immediately.
    */
-  public abstract class EditWithDialog extends Edit {
+  public abstract class EditWithDialog extends Edit implements WindowListener {
+    public CellProperties props;
     public PDFExtractor module;
-    public EditWithDialog() {
+    public JDialog dialog;
+    public EditWithDialog(CellProperties props) {
+      this.props = props;
       module = null;
+      dialog = null;
     }
+    @Override public void apply() throws CWCException, BadEdit {
+      if (props == null) { // no properties yet, open a dialog to get them
+	openDialog();
+      } else {
+	applyNow();
+      }
+    }
+    public void openDialog() {
+      if (module == null)
+	throw new RuntimeException("expected module to be set in EditWithDialog before apply() with props==null, but got module==null");
+      CellProperties.Editor editor = getEditor();
+      props = editor.getProperties();
+      JFrame tableWindow = (JFrame)
+	module.tableModel2view.get(Table.this).getTopLevelAncestor(); // ouch.
+      dialog = new JDialog(tableWindow, getDialogTitle(), true);
+      dialog.addWindowListener(this);
+      dialog.add(editor);
+      dialog.pack();
+      dialog.setVisible(true);
+    }
+    public abstract CellProperties.Editor getEditor();
+    public abstract void applyNow();
+    public abstract String getDialogTitle();
+    // verify the last focused field and report this edit when the dialog
+    // closes
+    @Override public void windowClosing(WindowEvent evt) {
+      Component field = dialog.getMostRecentFocusOwner();
+      if (field instanceof JTextComponent) {
+	JTextComponent textField = (JTextComponent)field;
+	InputVerifier v = textField.getInputVerifier();
+	if (v != null)
+	  v.shouldYieldFocus(textField);
+      }
+      applyNow();
+      module.reportEdit(EditWithDialog.this, false);
+    }
+    // other WindowListener methods
+    // (my kingdom for multiple inheritance with WindowAdapter...)
+    @Override public void windowActivated(WindowEvent evt) {}
+    @Override public void windowClosed(WindowEvent evt) {}
+    @Override public void windowDeactivated(WindowEvent evt) {}
+    @Override public void windowDeiconified(WindowEvent evt) {}
+    @Override public void windowIconified(WindowEvent evt) {}
+    @Override public void windowOpened(WindowEvent evt) {}
   }
 
   /** Edit the CellProperties of a cell (wrapping it in EditedCell if
@@ -2765,50 +3031,30 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class EditCell extends EditWithDialog {
     public final static String kqmlVerb = "edit-cell";
     public final static String buttonLabel = "Edit Cell";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public final int row;
     public int col; // not final because SplitColumn might happen
-    public CellProperties props;
     public EditCell(int row, int col, CellProperties props) {
+      super(props);
       this.row = row;
       this.col = col;
-      this.props = props;
     }
     public EditCell(int row, int col) { this(row, col, null); }
-    @Override public void apply() throws CWCException, BadEdit {
-      if (props == null) { // no properties yet, open a dialog to get them
-	if (module == null)
-	  throw new RuntimeException("expected module to be set in EditCell before apply() with props==null, but got module==null");
-	RectangularTextContainer cell = getCellAt(row, col);
-	CellProperties.Editor editor = Cell.getEditorOf(cell);
-	editor.setContext(Table.this, row, col, Cell.getSpanOf(cell));
-	props = editor.getProperties();
-	JFrame tableWindow = (JFrame)
-	  module.tableModel2view.get(Table.this).getTopLevelAncestor(); // ouch.
-	JDialog dialog =
-	  new JDialog(tableWindow,
-		      "edit cell " + Cell.cellIndexToRef(row, col) +
-		      " of " + id,
-		      true);
-	// verify the last focused field and report this edit when the dialog
-	// closes
-	dialog.addWindowListener(new WindowAdapter() {
-	  @Override public void windowClosing(WindowEvent evt) {
-	    Component field = dialog.getMostRecentFocusOwner();
-	    if (field instanceof JTextComponent) {
-	      JTextComponent textField = (JTextComponent)field;
-	      InputVerifier v = textField.getInputVerifier();
-	      if (v != null)
-		v.shouldYieldFocus(textField);
-	    }
-	    module.reportEdit(EditCell.this, false);
-	    fireTableCellUpdated(row, col);
-	  }
-	});
-	dialog.add(editor);
-	dialog.pack();
-	dialog.setVisible(true);
-      }
+    @Override public CellProperties.Editor getEditor() {
+      RectangularTextContainer cell = getCellAt(row, col);
+      CellProperties.Editor editor = Cell.getEditorOf(cell, false);
+      editor.setContext(Table.this, row, col, Cell.getSpanOf(cell));
+      return editor;
+    }
+    @Override public void applyNow() {
       setCellAt(row, col, Cell.setPropertiesOf(getCellAt(row, col), props));
+    }
+    @Override public String getDialogTitle() {
+      return "edit cell " + Cell.cellIndexToRef(row, col) + " of " + id;
+    }
+    @Override public void windowClosing(WindowEvent evt) {
+      super.windowClosing(evt);
+      fireTableCellUpdated(row, col);
     }
     public void insertColumn(int newCol) {
       if (newCol < col) col++;
@@ -2869,76 +3115,46 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class EditCells extends EditWithDialog {
     public final static String kqmlVerb = "edit-cells";
     public final static String buttonLabel = "Edit Cells";
+    public final static int fromSelectionType = SELECTION_TYPE_CELLS;
     public final int firstRow, lastRow;
     public int firstCol, lastCol; // not final because SplitColumn might happen
-    public CellProperties props;
     public EditCells(int firstRow, int firstCol, int lastRow, int lastCol, CellProperties props) {
+      super(props);
       this.firstRow = firstRow;
       this.firstCol = firstCol;
       this.lastRow = lastRow;
       this.lastCol = lastCol;
-      this.props = props;
     }
     public EditCells(int firstRow, int firstCol, int lastRow, int lastCol) {
       this(firstRow, firstCol, lastRow, lastCol, null);
     }
-    @Override public void apply() throws CWCException, BadEdit {
-      if (props == null) { // no properties yet, open a dialog to get them
-	if (module == null)
-	  throw new RuntimeException("expected module to be set in EditCells before apply() with props==null, but got module==null");
-	CellProperties.Editor editor = CellProperties.getEditor();
-	props = editor.getProperties();
-	JFrame tableWindow = (JFrame)
-	  module.tableModel2view.get(Table.this).getTopLevelAncestor(); // ouch.
-	JDialog dialog =
-	  new JDialog(tableWindow,
-		      "edit cells " + Cell.cellIndexToRef(firstRow, firstCol) +
-		      "-" + Cell.cellIndexToRef(lastRow, lastCol) +
-		      " of " + id,
-		      true);
-	// verify the last focused field, clone the properties to each cell,
-	// and report this edit, when the dialog closes
-	dialog.addWindowListener(new WindowAdapter() {
-	  @Override public void windowClosing(WindowEvent evt) {
-	    Component field = dialog.getMostRecentFocusOwner();
-	    if (field instanceof JTextComponent) {
-	      JTextComponent textField = (JTextComponent)field;
-	      InputVerifier v = textField.getInputVerifier();
-	      if (v != null)
-		v.shouldYieldFocus(textField);
-	    }
-	    // do the else branch now that we have props set
-	    try {
-	      apply();
-	    } catch (CWCException ex) {
-	      throw new RuntimeException("this should never happen", ex);
-	    } catch (BadEdit ex) {
-	      throw new RuntimeException("this should never happen", ex);
-	    }
-	    // report the change to TRIPS and to any TableModelListeners
-	    module.reportEdit(EditCells.this, false);
-	    fireTableDataChanged();
-	  }
-	});
-	dialog.add(editor);
-	dialog.pack();
-	dialog.setVisible(true);
-      } else { // have properties already, just apply them
-	// set properties of each cell in the range using a clone of props
-	// that has headingFor set to the default for that cell, and has
-	// newText set so that the content doesn't change
-	for (int i = firstRow; i <= lastRow; i++) {
-	  for (int j = firstCol; j <= lastCol; j++) {
-	    RectangularTextContainer cell = getCellAt(i, j);
-	    CellProperties op = Cell.getPropertiesOf(cell);
-	    CellProperties p = props.clone();
-	    p.newText = op.newText;
-	    p.headingFor =
-	      p.getDefaultHeadingFor(Table.this, i, j, getSpanAt(i, j));
-	    setCellAt(i, j, Cell.setPropertiesOf(cell, p));
-	  }
+    @Override public CellProperties.Editor getEditor() {
+      return new CellProperties().getMulticellEditor();
+    }
+    @Override public void applyNow() {
+      // set properties of each cell in the range using a clone of props
+      // that has headingFor set to the default for that cell, and has
+      // newText set so that the content doesn't change
+      for (int i = firstRow; i <= lastRow; i++) {
+	for (int j = firstCol; j <= lastCol; j++) {
+	  RectangularTextContainer cell = getCellAt(i, j);
+	  CellProperties op = Cell.getPropertiesOf(cell);
+	  CellProperties p = props.clone();
+	  p.newText = op.newText;
+	  p.headingFor =
+	    p.getDefaultHeadingFor(Table.this, i, j, getSpanAt(i, j));
+	  setCellAt(i, j, Cell.setPropertiesOf(cell, p));
 	}
       }
+    }
+    @Override public String getDialogTitle() {
+      return "edit cells " + Cell.cellIndexToRef(firstRow, firstCol) +
+	     "-" + Cell.cellIndexToRef(lastRow, lastCol) +
+	     " of " + id;
+    }
+    @Override public void windowClosing(WindowEvent evt) {
+      super.windowClosing(evt);
+      fireTableDataChanged();
     }
     public void insertColumn(int newCol) {
       if (newCol < firstCol) firstCol++;
@@ -2988,72 +3204,54 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
   public class EditCaption extends EditWithDialog {
     public final static String kqmlVerb = "edit-caption";
     public final static String buttonLabel = "Edit Caption";
-    public String newText;
-    public EditCaption(String newText) {
-      this.newText = newText;
+    public final static int fromSelectionType = SELECTION_TYPE_NONE;
+    public EditCaption(CellProperties props) {
+      super(props);
     }
     public EditCaption() { this(null); }
-    @Override public void apply() throws CWCException, BadEdit {
-      if (newText == null) { // no caption yet, open a dialog to get it
-	if (module == null)
-	  throw new RuntimeException("expected module to be set in EditCaption before apply() with newText==null, but got module==null");
-	JFrame tableWindow = (JFrame)
-	  module.tableModel2view.get(Table.this).getTopLevelAncestor(); // ouch.
-	JDialog dialog =
-	  new JDialog(tableWindow, "edit caption of " + id, true);
-	JLabel label = new JLabel("Caption: ");
-	newText = ((Table.this.caption == null) ? "" :
-		    HTMLBuilder.htmlToTextString(Table.this.caption));
-	String oldText = newText;
-	int numLines = newText.split("\n").length;
-	JTextArea input =
-	  new JTextArea(newText, Math.max(2, numLines), 40);
-	// report this edit when the dialog closes
-	dialog.addWindowListener(new WindowAdapter() {
-	  @Override public void windowClosing(WindowEvent evt) {
-	    newText = input.getText();
-	    if (newText.equals(oldText)) { // no change, don't report edit
-	      return;
-	    } else if (newText.equals("")) { // empty, delete caption
-	      Table.this.caption = null;
-	    } else {
-	      Table.this.caption = HTMLBuilder.textToFragmentString(newText);
-	    }
-	    module.reportEdit(EditCaption.this, false);
-	    // the structure of the table didn't really change, but this makes
-	    // sure the display is updated
-	    fireTableStructureChanged();
-	  }
-	});
-	dialog.add(label, BorderLayout.WEST);
-	dialog.add(input);
-	dialog.pack();
-	dialog.setVisible(true);
+    @Override public CellProperties.Editor getEditor() {
+      // NOTE: this still works if caption==null
+      return Cell.getEditorOf(caption, true);
+    }
+    @Override public void applyNow() {
+      if ((props.newText == null && caption == null) ||
+	  (props.newText != null && props.newText.isEmpty())) {
+	// new text is "" (or unchanged from ""), so delete caption
+	caption = null;
       } else {
-	Table.this.caption =
-	  (newText.equals("") ? null :
-	    HTMLBuilder.textToFragmentString(newText));
+	// actually set a nonempty caption
+	if (caption == null)
+	  caption = new SyntheticCell(); // make a cell for EditedCell to wrap
+	caption = Cell.setPropertiesOf(caption, props);
       }
+    }
+    @Override public String getDialogTitle() { return "edit caption of " + id; }
+    @Override public void windowClosing(WindowEvent evt) {
+      super.windowClosing(evt);
+      // the structure of the table didn't really change, but this makes
+      // sure the display is updated
+      fireTableStructureChanged();
     }
     @Override public KQMLObject toKQML() {
       KQMLPerformative p = new KQMLPerformative(kqmlVerb);
-      if (newText != null)
-	p.setParameter(":content", new KQMLString(newText));
+      if (props != null)
+	props.toKQML(p, true);
       return p;
     }
   }
   public EditCaption editCaptionFromKQML(KQMLPerformative perf) throws CWCException {
-    String newText = Args.getTypedArgument(perf, ":content", String.class);
-    return new EditCaption(newText);
-  }
-  public EditCaption editCaptionFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make an EditCaption edit from a selection");
+    CellProperties props = CellProperties.fromKQML(Table.this, perf);
+    // disallow type/headingFor setting from KQML
+    props.type = CellProperties.Type.DATA;
+    props.headingFor = null;
+    return new EditCaption(props);
   }
 
-  /** Add a caption from another page region. */
+  /** Add a caption from another page region. Replaces any existing caption. */
   public class AddCaption extends Edit {
-    public final static String kqmlVerb = "add-caption";
+    public final static String kqmlVerb = "add-caption"; // FIXME maybe call this something else to avoid confusion about the fact that this can replace the existing caption rather than add to it... "set-caption"? "extract-caption"?
     public final static String buttonLabel = "Add Caption";
+    public final static int fromSelectionType = SELECTION_TYPE_REGION;
     public final Region origin;
     public final String content;
     public AddCaption(Region origin) {
@@ -3061,16 +3259,16 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       this.content = Cell.getHTMLOf(origin).toFragmentString();
     }
     @Override public void apply() throws CWCException, BadEdit {
-      Table.this.caption = content;
+      Table.this.caption = new Note(origin);
     }
     @Override public KQMLObject toKQML() {
       KQMLPerformative p = new KQMLPerformative(kqmlVerb);
       p.setParameter(":origin", origin.toKQML());
       return p;
     }
-    public String getButtonLabel() {
+    @Override public String getButtonLabel() {
       HTMLBuilder out = new HTMLBuilder();
-      out.text(buttonLabel).text(": ");
+      out.text((caption == null ? "Add Caption: " : "Replace Caption With: "));
       if (content.length() > 34) { // too long, replace rest with elipsis
 	int end = 30;
 	// avoid cutting through any <sup></sup> or <br/> tags
@@ -3098,8 +3296,169 @@ public class Table extends AbstractTableModel implements HasID, TextMatch.Search
       throw new InvalidArgument(perf, ":origin", "region ID or description");
     }
   }
-  public AddCaption addCaptionFromSelection(TableSelection sel) throws BadEdit {
-    throw new BadEdit("can't make an AddCaption edit from a table selection");
+  public AddCaption addCaptionFromSelection(Region sel) throws BadEdit {
+    // check whether the current caption is already from this region
+    Cell cap = caption;
+    while (true) {
+      if (cap == null || (cap instanceof SyntheticCell)) {
+	break;
+      } else if (cap instanceof Note) {
+	if (((Note)cap).origin == sel)
+	  throw new RegionAlreadyUsed(sel);
+	break;
+      } else if (cap instanceof EditedCell) {
+	cap = (Cell)(((EditedCell)cap).original);
+      } else {
+	throw new RuntimeException("unexpected cell type in caption: " + cap.getClass());
+      }
+    }
+    return new AddCaption(sel);
+  }
+
+  /** Add a footnote from another page region. */
+  public class AddFootnote extends Edit {
+    public final static String kqmlVerb = "add-footnote";
+    public final static String buttonLabel = "Add Footnote";
+    public final static int fromSelectionType = SELECTION_TYPE_REGION;
+    public final Region origin;
+    public final String content;
+    public AddFootnote(Region origin) {
+      this.origin = origin;
+      this.content = Cell.getHTMLOf(origin).toDocumentString();
+    }
+    @Override public void apply() throws CWCException, BadEdit {
+      Table.this.footnotes.addElement(new Note(origin));
+    }
+    @Override public KQMLObject toKQML() {
+      KQMLPerformative p = new KQMLPerformative(kqmlVerb);
+      p.setParameter(":origin", origin.toKQML());
+      return p;
+    }
+    @Override public String getButtonLabel() {
+      HTMLBuilder out = new HTMLBuilder();
+      out.text(buttonLabel).text(": ");
+      if (content.length() > 34) { // too long, replace rest with elipsis
+	int end = 30;
+	// avoid cutting through any <sup></sup> or <br/> tags
+	int supIndex = content.lastIndexOf("<sup>", end+5);
+	int endSupIndex = content.lastIndexOf("</sup>", end+6);
+	if (supIndex > endSupIndex || end-6 < endSupIndex)
+	  end = supIndex;
+	int brIndex = content.lastIndexOf("<br/>", end+5);
+	if (end-5 < brIndex && brIndex < end)
+	  end = brIndex;
+	out.html(content.substring(0, end)).text(" ...");
+      } else {
+	out.html(content);
+      }
+      return out.toDocumentString();
+    }
+  }
+  public AddFootnote addFootnoteFromKQML(KQMLPerformative perf) throws CWCException {
+    KQMLObject originKQML =
+      Args.getTypedArgument(perf, ":origin", KQMLObject.class);
+    try {
+      Region origin = Region.fromKQML(originKQML);
+      return new AddFootnote(origin);
+    } catch (KQMLBadPerformativeException ex) {
+      throw new InvalidArgument(perf, ":origin", "region ID or description");
+    }
+  }
+  public AddFootnote addFootnoteFromSelection(Region sel) throws BadEdit {
+    // check whether we already added this footnote
+    int i = 0;
+    for (Enumeration<Cell> fnEnum = footnotes.elements();
+         fnEnum.hasMoreElements();
+	 ) {
+      Cell fn = fnEnum.nextElement();
+      while (true) {
+	if (fn == null || (fn instanceof SyntheticCell)) {
+	  break;
+	} else if (fn instanceof Note) {
+	  if (((Note)fn).origin == sel) {
+	    throw new RegionAlreadyUsed(sel);
+	  }
+	  break;
+	} else if (fn instanceof EditedCell) {
+	  fn = (Cell)(((EditedCell)fn).original);
+	} else {
+	  throw new RuntimeException("unexpected cell type in footnote: " + fn.getClass());
+	}
+      }
+      i++;
+    }
+    return new AddFootnote(sel);
+  }
+
+  /** Edit a footnote of the table. */
+  public class EditFootnote extends EditWithDialog {
+    public final static String kqmlVerb = "edit-footnote";
+    public final static String buttonLabel = "Edit Footnote";
+    public final static int fromSelectionType = SELECTION_TYPE_FOOTNOTE;
+    public final int index;
+    public EditFootnote(int index, CellProperties props) {
+      super(props);
+      this.index = index;
+    }
+    public EditFootnote(int index) { this(index, null); }
+    @Override public CellProperties.Editor getEditor() {
+      return Cell.getEditorOf(footnotes.get(index), true);
+    }
+    @Override public void applyNow() {
+      Cell footnote = footnotes.get(index);
+      footnotes.set(index, Cell.setPropertiesOf(footnote, props));
+    }
+    @Override public String getDialogTitle() { return "edit caption of " + id; }
+    @Override public KQMLObject toKQML() {
+      KQMLPerformative p = new KQMLPerformative(kqmlVerb);
+      p.setParameter(":index", ""+index);
+      if (props != null)
+	props.toKQML(p, true);
+      return p;
+    }
+  }
+  public EditFootnote editFootnoteFromKQML(KQMLPerformative perf) throws CWCException {
+    int index = Args.getTypedArgument(perf, ":index", Integer.class);
+    CellProperties props = CellProperties.fromKQML(Table.this, perf);
+    // disallow type/headingFor setting from KQML
+    props.type = CellProperties.Type.DATA;
+    props.headingFor = null;
+    return new EditFootnote(index, props);
+  }
+  public EditFootnote editFootnoteFromSelection(ListSelectionEvent sel) throws BadEdit {
+    ListSelectionModel source = (ListSelectionModel)sel.getSource();
+    if (source.isSelectionEmpty())
+      throw new BadEdit("no footnote is selected");
+    int index = source.getMinSelectionIndex();
+    return new EditFootnote(index);
+  }
+  
+  /** Delete a footnote from the table. */
+  public class DeleteFootnote extends Edit {
+    public final static String kqmlVerb = "delete-footnote";
+    public final static String buttonLabel = "Delete Footnote";
+    public final static int fromSelectionType = SELECTION_TYPE_FOOTNOTE;
+    public final int index;
+    public DeleteFootnote(int index) { this.index = index; }
+    @Override public void apply() throws CWCException, BadEdit {
+      footnotes.remove(index);
+    }
+    @Override public KQMLObject toKQML() {
+      KQMLPerformative p = new KQMLPerformative(kqmlVerb);
+      p.setParameter(":index", ""+index);
+      return p;
+    }
+  }
+  public DeleteFootnote deleteFootnoteFromKQML(KQMLPerformative perf) throws CWCException {
+    int index = Args.getTypedArgument(perf, ":index", Integer.class);
+    return new DeleteFootnote(index);
+  }
+  public DeleteFootnote deleteFootnoteFromSelection(ListSelectionEvent sel) throws BadEdit {
+    ListSelectionModel source = (ListSelectionModel)sel.getSource();
+    if (source.isSelectionEmpty())
+      throw new BadEdit("no footnote is selected");
+    int index = source.getMinSelectionIndex();
+    return new DeleteFootnote(index);
   }
 
   /* TODO?

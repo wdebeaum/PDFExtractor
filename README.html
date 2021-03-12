@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/02/26 14:46:53 $
+$Date: 2021/03/12 22:14:19 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses <a href="https://tabula.technology/">Tabula</a> for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -139,12 +139,15 @@ $Date: 2021/02/26 14:46:53 $
 <tr><td><img src="images/merge-columns.png"><br><code>Merge Columns</code></td><td>Replaces the selected columns with a single column. In the new cells, the old columns will be separated by spaces where the amount of space in the original document warrants it.</td><td>multiple whole columns are selected<a href="#nm">*</a></td><td><code>merge-columns</code></td></tr>
 <tr><td><img src="images/merge-cells.png"><br><code>Merge Cells</code></td><td>Replace the selected cells with a single, individually-merged cell, while leaving the rest of the cells in the same rows or same columns separate.</td><td>multiple cells are selected<a href="#nm">*</a></td><td><code>merge-cells</code></td></tr>
 <tr><td><img src="images/undo-merge-cells.png"><br><code>Undo Merge Cells</code></td><td>Undo the <code>Merge Cells</code> edit that was performed to produce the selected cell. This can be a manual <code>Merge Cells</code>, or part of <code>Auto-Split Columns</code> or <code>Auto-Merge Cells</code>, and it need not have been the last edit done. If more than one cell is selected, each individually-merged cell in the selection that can be undone will be. If other cells also happen to be selected, they will be ignored.</td><td>at least one individually-merged cell is selected, such that other edits have not since been done that would complicate undoing the merger (any <code>Append rows of <var>table-ID</var></code> or <code>Split Column at X=<var>x</var></code> edits, or <code>Edit Cell(s)</code> of the merged cell)</td><td><code>(undo (merge-cells <var>...</var>))</code></td></tr>
-<tr><td><img src="images/merge-tables.png"><br><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window, and in the tooltip for this button) to the end of this table.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
+<tr><td><img src="images/merge-tables.png"><br><code>Append rows of <var>table-ID</var></code></td><td>Add all the rows from the table identified by <var>table-ID</var> (which appears in the title bar of its table window, and in the tooltip for this button) to the end of this table. Also add all the footnotes from that table to this table, after this table's existing footnotes. This table retains its caption if any.</td><td>both tables have the same number of columns</td><td><code>merge-tables</code></td></tr>
 <tr><td><img src="images/split-column.png"><br><code>Split column at X=<var>x</var></code></td><td>Split a column by adding a new column boundary at the given <var>x</var> coordinate (in pixels). The <var>x</var> coordinate appears in the tooltip for this button.</td><td>a region was selected in the document window whose left edge could split a column, and no other tables have been appended yet</td><td><code>split-column</code></td></tr>
 <tr><td><img src="images/edit-cell.png"><br><code>Edit Cell</code></td><td>Edit the content, annotations, and type of a cell, and if it is a heading, edit which cells it is a heading for. A window will appear with a form for editing this information; the edit will take place when the window closes. Double-clicking on a cell does the same thing as clicking this button.</td><td>exactly one cell is selected</td><td><code>edit-cell</code></td></tr>
 <tr><td><img src="images/edit-cells.png"><br><code>Edit Cells</code></td><td>Edit the annotations and type of multiple cells at once, using the same values for all the cells. The content won't be affected, and the "Heading for cells" field will be set to the default for the selected type, for each cell.</td><td>multiple cells are selected</td><td><code>edit-cells</code></td></tr>
-<tr><td><img src="images/edit-caption.png"><br><code>Edit Caption</code></td><td>Edit the caption that appears above the table. A window will appear with a text field to edit; the edit will take place when the window closes. Double-clicking an existing caption does the same thing as clicking this button.</td><td>always</td><td><code>edit-caption</code></td></tr>
-<tr><td><img src="images/add-caption.png"><br><code>Add Caption: <var>caption</var>...</code></td><td>Use the content of a region you selected as the caption. The first part of this content appears in the tooltip.</td><td>a region was selected in the document window on the same page as the table, after the table was selected, and it is not currently used as the caption</td><td><code>add-caption</code></td></tr>
+<tr><td><img src="images/edit-caption.png"><br><code>Edit Caption</code></td><td>Edit the caption that appears above the table. A window will appear with a form for editing the content and annotations of the caption; the edit will take place when the window closes. Double-clicking an existing caption does the same thing as clicking this button.</td><td>always</td><td><code>edit-caption</code></td></tr>
+<tr><td><img src="images/add-caption.png"><br><code>Add Caption</code>/<code>Replace Caption With: <var>caption</var>...</code></td><td>Use the content of a region you selected as the caption (if there is already a caption it will be replaced with the new content). The first part of this content appears in the tooltip.</td><td>a region was selected in the document window on the same page as the table, after the table was selected, and it is not currently used as the caption</td><td><code>add-caption</code></td></tr>
+<tr><td><img src="images/add-footnote.png"><br><code>Add Footnote: <var>footnote</var>...</code></td><td>Add a footnote to the bottom of the table with the content of a region you selected. The first part of this content appears in the tooltip. Note that a table has at most one caption, but may have multiple footnotes.</td><td>a region was selected in the document window on the same page as the table, after the table was selected, and it is not currently used as a footnote.</td><td><code>add-footnote</code></td></tr>
+<tr><td><img src="images/edit-footnote.png"><br><code>Edit Footnote</code></td><td>Edit the content and annotations of a footnote. A window will appear with a form for editing this information; the edit will take place when the window closes. Double-clicking on a footnote does the same thing as clicking this button.</td><td>a footnote is selected</td><td><code>edit-footnote</code></td></tr>
+<tr><td><img src="images/delete-footnote.png"><br><code>Delete Footnote</code></td><td>Delete the selected footnote.</td><td>a footnote is selected</td><td><code>delete-footnote</code></td></tr>
 </table>
 <p><a name="nm">*</a> and the selection touches no individually-merged cells</p>
 
@@ -204,6 +207,12 @@ $Date: 2021/02/26 14:46:53 $
 
 <p>You can also edit multiple cells at once, by selecting all of them and clicking the <code>Edit Cells</code> button. A similar window will appear, but it will only have the <code>Annotations</code> and <code>Cell type</code> fields. The contents of the cells won't change, and the <code>Heading for cells</code> field will use its default value for the type and the position of the cell in the table. If the default isn't what you want, you can edit each cell individually. For example, you could select the top few rows of a table, click <code>Edit Cells</code> and set their type to <code>column heading</code>. Then you could close that window, select one of the column headings, click <code>Edit Cell</code>, and change its <code>Heading for cells</code> field.</p>
 
+<h3>Caption and Footnotes</h3>
+
+<p>A table can have a single caption at the top, and it can have a number of footnotes at the bottom. I will refer to both of these as "notes". Notes are extracted separately from the table, using different page region selections. Notes don't count as cells in the table; edits that operate on cells, like <code>Delete Rows</code> and <code>Split Column at X=<var>x</code>, do not affect notes. The caption cannot be selected (since there's only one to select), and you can only select one footnote at a time (and you can't select cells and a footnote together, only one or the other).</p>
+
+<p>You can edit notes in a similar way to editing cells. The editor dialog window for notes only shows the <code>Original content</code>, <code>Edited content</code>, and <code>Annotations</code> fields, not the <code>Cell type</code> and <code>Heading for cells</code> fields. You can delete the caption by deleting its contents (there is no <code>Delete Caption</code> button).</p>
+
 <h3>Save formats and opening tables in other programs</h3>
 
 <p>You can save a table in two different formats: CSV and HTML. CSV is less expressive (in particular it doesn't support cells that span multiple rows or columns; their contents appear in the top left cell in the span) but it is more widely supported. You might prefer CSV for simpler tables that you want to import into a database or other program, while you might prefer HTML for tables with more complex structure that you want to import into a spreadsheet that can handle it. The PDFLearn component in TRIPS also uses HTML tables from PDFExtractor.</p>
@@ -213,6 +222,10 @@ $Date: 2021/02/26 14:46:53 $
 <p>Excel can also import HTML tables, which reportedly work better.</p>
 
 <p>PDFExtractor may also include metadata in the <code>&lt;head&gt;</code> element of the HTML file (in <code>&lt;title&gt;</code>, <code>&lt;link&gt;</code>, and <code>&lt;meta&gt;</code> tags). These are derived from the PDF document the table was extracted from, and the table's relationship to it. In particular, the <code>&lt;meta&gt;</code> tags <code>author</code>, <code>description</code>, <code>keywords</code>, <code>created</code>, and <code>modified</code> are pulled from the PDF file, and apply to it, not the table.</p>
+
+<p>When an HTML table saved by PDFExtractor is viewed in a web browser (with JavaScript enabled), the caption and footnotes will appear above and below the table. In addition, the metadata described above will appear further below the table, separated into <code>Provenance</code> and <code>Original document metadata</code> sections. The <code>Provenance</code> includes a link to the original document, the <code>first-page-index</code> (the 0-based index of the first page the table was extracted from), and the <code>first-region-bbox</code> (the coordinates of the bounding box of the region on that page that was extracted). The <code>Original document metadata</code> includes the <code>&lt;meta&gt;</code> tags listed above that were pulled from the PDF file.</p>
+
+<p>When an HTML table saved by PDFExtractor is viewed in a spreadsheet program, only the heading and data cells in the table proper will be shown, not the caption, footnotes, or metadata.</p>
 
 <h3>Extended example</h3>
 
@@ -397,6 +410,7 @@ $Date: 2021/02/26 14:46:53 $
       ("<var>3,0</var>" "<var>3,1</var>" "<var>3,2</var>")
       )
       :rulings ()
+      :footnotes ()
     ))))
 </pre></code>
 
@@ -433,13 +447,13 @@ $Date: 2021/02/26 14:46:53 $
   (tell :content (report :content (displayed :what <var>table-id</var> :where <var>window-id</var>)))
 </pre></code>
 
-<p>Selecting cells in this display will result in a report like this:</p>
+<p>Selecting cells or footnotes in this display will result in a report like this:</p>
 
 <code><pre>
   (tell :content (report :content (selected :what <var>selection</var>)))
 </pre></code>
 
-<p>Where selection is one of the following, depending on whether whole rows or columns were selected, and whether more than one was selected:</p>
+<p>Where selection is one of the following, depending on whether whole rows or columns (or a footnote) were selected, and whether more than one was selected:</p>
 <ul>
  <li><code>(row :table <var>table-id</var> :index <var>row-index</var>)</code>
  <li><code>(column :table <var>table-id</var> :index <var>column-index</var>)</code>
@@ -447,6 +461,7 @@ $Date: 2021/02/26 14:46:53 $
  <li><code>(rows :table <var>table-id</var> :first <var>first-row-index</var> :last <var>last-row-index</var>)</code>
  <li><code>(columns :table <var>table-id</var> :first <var>first-column-index</var> :last <var>last-column-index</var>)</code>
  <li><code>(cells :table <var>table-id</var> :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var>)</code>
+ <li><code>(footnote :table <var>table-id</var> :index <var>footnote-index</var>)</code>
 </ul>
 
 <p>You can also make a new table to display by giving a description of the table (in a similar format to that returned by <code>parse-table</code>) instead of the ID of an existing table:</p>
@@ -458,7 +473,10 @@ $Date: 2021/02/26 14:46:53 $
       ("<var>1,0</var>" "<var>1,1</var>" "<var>1,2</var>")
       ("<var>2,0</var>" "<var>2,1</var>" "<var>2,2</var>")
       ("<var>3,0</var>" "<var>3,1</var>" "<var>3,2</var>")
-      ))))
+      )
+      [ :caption "<var>caption-text</var>" ]
+      [ :footnotes ("<var>footnote-0-text</var>" "<var>footnote-1-text</var>"...) ]
+      )))
 </pre></code>
 
 <p>Note that you should not supply <code>:id</code> in this case (that will just look up an existing table), and <code>:rulings</code> currently does nothing.</p>
@@ -468,14 +486,14 @@ $Date: 2021/02/26 14:46:53 $
   (request :content ({ select | deselect } :what <var>region</var>))
 </pre></code>
 
-<p>This will select or deselect the table cells or page region (rectangle) described by <var>region</var>. For table cells, any of the <var>selection</var> types listed above for <code>selected</code> reports will work. For example, for a table row, specify the <var>table-id</var> and <var>row-index</var> like this:</p>
+<p>This will select or deselect the table cells, footnote, or page region (rectangle) described by <var>region</var>. For table cells and footnotes, any of the <var>selection</var> types listed above for <code>selected</code> reports will work. For example, for a table row, specify the <var>table-id</var> and <var>row-index</var> like this:</p>
 
 <code><pre>
   (request :content (select :what
     (row :table <var>table-id</var> :index <var>row-index</var>)))
 </pre></code>
 
-<p>Note that <code>deselect</code>ing some table cells may also cause others to be deselected, since only single rectangular selections are allowed.</p>
+<p>Note that <code>deselect</code>ing some table cells may also cause others to be deselected, since only single rectangular selections are allowed. Also note that only one footnote may be selected at a time, and only one of table cells or a footnote may be selected at a time.</p>
 
 <p>For a page region, either specify everything necessary to create a new rectangle:</p>
 
@@ -531,10 +549,16 @@ $Date: 2021/02/26 14:46:53 $
   <dd>Edit the properties of the cell at (<var>row-index</var>, <var>column-index</var>), replacing the values of any specified fields with the specified values, and replacing the values of the other fields with default values. Note that <var>new-type</var> should be a symbol (not a string), one of <code>data</code>, <code>row-heading</code>, or <code>column-heading</code>. Also note that <code>:heading-for</code> takes a string in the same format as the <code>Heading for cells</code> field in the GUI, e.g. <code>"B3-C45"</code>. The default <code>:content</code> is the original cell content from the document. The other defaults are <code>:annotations "" :type data :heading-for "N/A"</code>. But if <code>:type</code> is specified, <code>:heading-for</code> will default to an appropriate value for that type and the position of the cell in the table.
  <dt><code>(edit-cells :first-row <var>first-row-index</var> :first-column <var>first-column-index</var> :last-row <var>last-row-index</var> :last-column <var>last-column-index</var><br> [ :annotations "<var>new-annotations</var>" ] [ :type <var>new-type</var> ])</code>
   <dd>Edit some of the properties of all of the cells in the specified rectangular region. Note that unlike <code>edit-cell</code>, this won't accept <code>:content</code> or <code>:heading-for</code> arguments.
- <dt><code>(edit-caption :content "<var>new-content</var>")</code>
-  <dd>Edit the caption displayed above the table, replacing its contents with <var>new-content</var>. If empty, the caption won't be displayed, or included in saved HTML.
  <dt><code>(add-caption :origin <var>region</var>)</code>
   <dd>Add a caption (or replace the existing one) using the content of <var>region</var>, which can be the ID of an existing region, or the description of a new region.
+ <dt><code>(add-footnote :origin <var>region</var>)</code>
+  <dd>Add a footnote (after any existing ones) using the content of <var>region</var>.
+ <dt><code>(edit-caption [ :content <var>new-content</var> ] [ :annotations <var>new-annotations</var> ])</code>
+  <dd>Edit the properties of the caption displayed above the table. This works the same as <code>edit-cell</code> except that the <code>:type</code> and <code>:heading-for</code> fields are not allowed. If you specify <code>:content ""</code>, the caption will effectively be deleted (it won't be displayed, or included in saved HTML).
+ <dt><code>(edit-footnote :index <var>footnote-index</var> [ :content <var>new-content</var> ] [ :annotations <var>new-annotations</var> ])</code>
+  <dd>Edit the properties of the footnote at index <var>footnote-index</var>. Unlike captions, empty footnotes are allowed. Use <code>delete-footnote</code> to delete them.
+ <dt><code>(delete-footnote :index <var>footnote-index</var>)</code>
+  <dd>Delete the footnote at index <var>footnote-index</var>.
  <dt><code>(undo)</code>
   <dd>Moves backward in the edit history, undoing the most recently done edit.
  <dt><code>(redo)</code>
@@ -545,7 +569,7 @@ $Date: 2021/02/26 14:46:53 $
 
 <p>The reply to the <code>edit-table</code> request is in almost the same format as for the <code>parse-table</code> request, and includes the <code>:data</code> for the table after the edit was applied. It also includes an <code>:edit</code> argument which is the actual edit that was applied.</p>
 
-<p>Many of these edits can be performed from the GUI by selecting some cells and clicking the corresponding button in the toolbar at the top of the table window. These will show up as buttons when the current selection allows them, e.g. select two or more columns with no individually-merged cells in them in order to make the <code>Merge Columns</code> button appear. Some edits depend on other factors; <code>merge-tables</code> appears as <code>Append rows of <var>table-ID</var></code> when <var>table-ID</var> has the same number of columns, and <code>split-column</code> appears as <code>Split column at X=<var>x</var></code> when a rectangle is selected whose minimum <var>x</var> coordinate could be used to divide a column. The <code>select-and-reorder-rows</code>/<code>columns</code> edits can't be done from the GUI.</p>
+<p>Many of these edits can be performed from the GUI by selecting some cells/notes and clicking the corresponding button in the toolbar at the top of the table window. These will show up as buttons when the current selection allows them, e.g. select two or more columns with no individually-merged cells in them in order to make the <code>Merge Columns</code> button appear. Some edits depend on other factors; <code>merge-tables</code> appears as <code>Append rows of <var>table-ID</var></code> when <var>table-ID</var> has the same number of columns, and <code>split-column</code> appears as <code>Split column at X=<var>x</var></code> when a rectangle is selected whose minimum <var>x</var> coordinate could be used to divide a column. The <code>select-and-reorder-rows</code>/<code>columns</code> edits can't be done from the GUI.</p>
 
 <p>When you perform an edit from the GUI, it will be reported like this:</p>
 
@@ -603,7 +627,7 @@ $Date: 2021/02/26 14:46:53 $
 
 <dl>
  <dt><code>(file :name "<var>filename</var>" [ :format { "text/csv" | "text/html" } ])</code>
-  <dd>A structure describing the file. If <code>:format</code> is <code>"text/csv"</code>, the table will be written as a comma-separated-values (CSV) file. If <code>:format</code> is <code>"text/html"</code>, the table will be written as an HTML file with a <code>&lt;table&gt;</code> element in it. The HTML format preserves more formatting information (cell spans, superscripts, and edited cell properties). The default is <code>:format "text/csv"</code>.
+  <dd>A structure describing the file. If <code>:format</code> is <code>"text/csv"</code>, the table will be written as a comma-separated-values (CSV) file. If <code>:format</code> is <code>"text/html"</code>, the table will be written as an HTML file with a <code>&lt;table&gt;</code> element in it. The HTML format preserves more information (cell spans, superscripts, edited cell properties, the caption, footnotes, and metadata). The default is <code>:format "text/csv"</code>.
  <dt><code>"<var>filename</var>"</code>
   <dd>Just the filename in a string. The format will be assumed to be CSV unless the filename ends with <code>.html</code>, in which case it will be assumed to be HTML.
  <dt><code>choose</code>

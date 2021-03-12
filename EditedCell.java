@@ -24,8 +24,8 @@ public class EditedCell extends Cell {
     properties = new CellProperties();
   }
 
-  public CellProperties.Editor getEditor() {
-    return properties.getEditor(original);
+  public CellProperties.Editor getEditor(boolean isNote) {
+    return properties.getEditor(original, isNote);
   }
 
   //// Cell/RTC/HasText ////

@@ -1,6 +1,7 @@
 package TRIPS.PDFExtractor;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Dimension;
@@ -8,11 +9,17 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.ListCellRenderer;
+import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.LineBorder;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import technology.tabula.RectangularTextContainer;
@@ -21,13 +28,15 @@ import TRIPS.util.cwc.CWCException;
 /** Replacement for JTable that uses GridBagLayout to support rowspan/colspan,
  * and displays a {@link Table}.
  */
-public class SpanTable extends JPanel implements TableModelListener, TableSelectionListener, MouseListener {
+public class SpanTable extends JPanel implements TableModelListener, TableSelectionListener, ListSelectionListener, MouseListener, ListCellRenderer<Cell> {
   PDFExtractor module;
   Table model;
   TableSelectionModel selectionModel;
   GridBagLayout layout;
   JLabel caption;
   List<List<JLabel>> rows;
+  JList<Cell> footnotes;
+  ListCellRenderer<? super Cell> defaultFootnoteRenderer;
 
   public SpanTable(PDFExtractor module, Table model) {
     super(new GridBagLayout());
@@ -37,11 +46,24 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
     model.addTableModelListener(this);
     selectionModel = new TableSelectionModel(model);
     selectionModel.addListener(this);
+    footnotes = new JList<Cell>(model.getFootnotes());
+    defaultFootnoteRenderer = footnotes.getCellRenderer();
+    footnotes.setCellRenderer(this);
+    footnotes.setBackground(Color.WHITE);
+    footnotes.setForeground(Color.BLACK);
+    footnotes.setSelectionBackground(Color.BLUE);
+    footnotes.setSelectionForeground(Color.WHITE);
+    footnotes.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+    footnotes.addListSelectionListener(this);
+    footnotes.addMouseListener(this);
     setBackground(Color.WHITE);
     makeChildren();
   }
 
   public TableSelectionModel getSelectionModel() { return selectionModel; }
+  public ListSelectionModel getFootnoteSelectionModel() {
+    return footnotes.getSelectionModel();
+  }
 
   JLabel makeCell(String content, Color bg, int hAlign, String tooltip) {
     JLabel cell = new JLabel(content);
@@ -70,12 +92,10 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
       c.gridy = 0;
       c.gridwidth = numCols+1;
       c.gridheight = 1;
-      String captionText = model.getCaption();
-      if (captionText == null) {
-	captionText = "";
-      } else {
-	captionText = "<html>" + captionText + "</html>";
-      }
+      Cell captionCell = model.getCaption();
+      String captionText = "";
+      if (captionCell != null)
+	captionText = captionCell.getHTML().toDocumentString();
       caption =
         makeCell(captionText, Color.WHITE, SwingConstants.CENTER, null);
       layout.setConstraints(caption, c);
@@ -161,6 +181,14 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 	}
       }
     }
+    { // footnotes
+      c.gridx = 0;
+      c.gridy = numRows+2;
+      c.gridwidth = numCols+1;
+      c.gridheight = 1;
+      layout.setConstraints(footnotes, c);
+      add(footnotes);
+    }
   }
 
   //// TableModelListener ////
@@ -188,9 +216,18 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 	}
       }
     }
+    if (!sel.isEmpty())
+      footnotes.clearSelection();
   }
 
   @Override public void valueStoppedChanging(TableSelection sel) {}
+
+  //// ListSelectionListener ////
+  
+  @Override public void valueChanged(ListSelectionEvent evt) {
+    if (!footnotes.isSelectionEmpty())
+      selectionModel.clearSelection();
+  }
 
   //// MouseListener ////
   
@@ -200,8 +237,12 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
         evt.getClickCount() == 2) {
       GridBagConstraints c = layout.getConstraints(evt.getComponent());
       Table.EditWithDialog ed = null;
-      if (c.gridy == 0) // on a caption
+      if (c.gridy == 0) { // on a caption
 	ed = model.new EditCaption();
+      } else if (c.gridy == rows.size() + 2 && // on footnotes
+                 !footnotes.isSelectionEmpty()) { // and one is selected
+        ed = model.new EditFootnote(footnotes.getSelectedIndex());
+      }
       try {
 	if (ed == null) { // on a cell? (throw if not)
 	  TableSelection sel = new TableSelection(selectionModel);
@@ -228,7 +269,8 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 
   @Override public void mousePressed(MouseEvent evt) {
     GridBagConstraints c = layout.getConstraints(evt.getComponent());
-    if (c.gridy == 0) { // caption
+    if (c.gridy == 0 || // caption
+        c.gridy == rows.size() + 2) { // footnotes
       // ignore
     } else if (c.gridx == 0) { // row heading
       selectionModel.setAdjusting(true, false);
@@ -245,5 +287,15 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
   @Override public void mouseReleased(MouseEvent evt) {
     selectionModel.setAdjusting(false, false);
     selectionModel.fireValueChanged();
+  }
+
+  //// ListCellRenderer<Cell> ////
+
+  @Override public Component getListCellRendererComponent(JList<? extends Cell> list, Cell value, int index, boolean isSelected, boolean cellHasFocus) {
+    // first, delegate to the default ListCellRenderer
+    Component c = defaultFootnoteRenderer.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+    // then override the border
+    ((JComponent)c).setBorder(new LineBorder(Color.BLACK));
+    return c;
   }
 }

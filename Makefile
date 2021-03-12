@@ -23,6 +23,7 @@ SRCS=$(MAIN).java \
 	IntervalRelation.java \
 	LearningGUI.java \
 	MergedCell.java \
+	Note.java \
 	Page.java \
 	PDFPane.java \
 	Region.java \
@@ -74,6 +75,7 @@ CLASSES=$(SRCS:.java=.class) \
 	PDFExtractor$$4.class \
 	PDFExtractor$$5.class \
 	PDFExtractor$$6.class \
+	PDFExtractor$$7.class \
 	PDFPane$$Listener.class \
 	Region$$1.class \
 	Region$$2.class \
@@ -89,58 +91,61 @@ CLASSES=$(SRCS:.java=.class) \
 	Table$$1.class \
 	Table$$2.class \
 	Table$$AddCaption.class \
+	Table$$AddFootnote.class \
 	Table$$AutoSplitColumn.class \
-	Table$$CellCoordinateComparator.class \
 	Table$$BadEdit.class \
+	Table$$CellCoordinateComparator.class \
 	Table$$DeleteColumns.class \
+	Table$$DeleteFootnote.class \
 	Table$$DeleteRows.class \
 	Table$$Edit.class \
 	Table$$EditCaption.class \
-	Table$$EditCaption$$1.class \
 	Table$$EditCell.class \
-	Table$$EditCell$$1.class \
 	Table$$EditCells.class \
-	Table$$EditCells$$1.class \
+	Table$$EditFootnote.class \
 	Table$$EditWithDialog.class \
 	Table$$MergeCells.class \
 	Table$$MergeColumns.class \
 	Table$$MergeRows.class \
 	Table$$MergeTables.class \
+	Table$$RegionAlreadyUsed.class \
 	Table$$SelectColumns.class \
 	Table$$SelectRows.class \
 	Table$$SplitColumn.class \
 	Table$$Undoable.class \
-	TableEditMenu$$AddCaptionAction.class \
+	TableEditMenu$$AutoMergeCellsAction.class \
 	TableEditMenu$$AutoMultiEditAction.class \
 	TableEditMenu$$AutoSplitColumnsAction.class \
-	TableEditMenu$$AutoMergeCellsAction.class \
 	TableEditMenu$$EditAction.class \
 	TableEditMenu$$EditCaptionAction.class \
 	TableEditMenu$$MergeTablesAction.class \
+	TableEditMenu$$RegionEditAction.class \
 	TableEditMenu$$SaveAction.class \
 	TableEditMenu$$SelectionEditAction.class \
-	TableEditMenu$$SplitColumnAction.class \
 	TableEditMenu$$UndoMergeCellsAction.class \
 	TableEditMenu$$UndoMergeCellsAction$$1.class \
 	TableEditMenu$$UndoRedoAction.class \
 	TextChunker$$1.class \
 	TextMatch$$1.class \
-	TextMatch$$Searchable.class \
 	TextMatch$$Order.class \
 	TextMatch$$Order$$Key.class \
+	TextMatch$$Searchable.class \
 	VisibilityFilter$$Renderer.class \
 	VisibilityFilter$$ShownGlyph.class
 
 XTRA = \
 	README.html \
 	images/add-caption.png \
+	images/add-footnote.png \
 	images/auto-merge-cells.png \
 	images/auto-split-columns.png \
 	images/delete-columns.png \
+	images/delete-footnote.png \
 	images/delete-rows.png \
 	images/edit-caption.png \
 	images/edit-cell.png \
 	images/edit-cells.png \
+	images/edit-footnote.png \
 	images/merge-cells.png \
 	images/merge-columns.png \
 	images/merge-rows.png \

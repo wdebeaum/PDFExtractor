@@ -19,11 +19,15 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JList;
 import javax.swing.JScrollPane;
+import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import technology.tabula.RectangularTextContainer;
 import TRIPS.KQML.*;
 import TRIPS.util.cwc.Args;
@@ -39,12 +43,13 @@ import TRIPS.util.cwc.WindowConfig;
 /**
  * PDFExtractor - semi-automatically extracts table data from PDFs
  */
-public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener, Page.Listener, TableSelectionListener {
+public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener, Page.Listener, TableSelectionListener, ListSelectionListener {
   boolean standalone;
   String curDir;
   Map<File, PDFPane> pdfFile2pane;
   Map<Table, SpanTable> tableModel2view;
   Map<Table, TableEditMenu> tableModel2menu;
+  Map<ListSelectionModel, Table> footnoteSelectionModel2table;
 
   public PDFExtractor(String[] argv) {
     super(argv);
@@ -53,6 +58,7 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
     pdfFile2pane = new HashMap<File, PDFPane>();
     tableModel2view = new HashMap<Table, SpanTable>();
     tableModel2menu = new HashMap<Table, TableEditMenu>();
+    footnoteSelectionModel2table = new HashMap<ListSelectionModel, Table>();
   }
 
   private void setLAF() {
@@ -975,6 +981,16 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
 	    r.setHighlighted(isSelect);
 	    // TODO? setNew/remove like in single rectangle case
 	}
+      } else if (whatVerb.equals("footnote")) {
+	KQMLObject tableKQML =
+	  Args.getTypedArgument(what, ":table", KQMLObject.class);
+	Table table = Table.fromKQML(tableKQML);
+	int index = Args.getTypedArgument(what, ":index", Integer.class);
+	SwingUtilities.invokeLater(new Runnable() {
+	  @Override public void run() {
+	    selectFootnote(table, index, isSelect);
+	  }
+	});
       } else if (TableSelection.verbOK(whatVerb)) {
 	TableSelection sel = TableSelection.fromKQML(what);
 	SwingUtilities.invokeLater(new Runnable() {
@@ -1156,6 +1172,9 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
     SpanTable view = new SpanTable(this, model);
     TableSelectionModel selModel = view.getSelectionModel();
     selModel.addListener(this);
+    ListSelectionModel fnSelModel = view.getFootnoteSelectionModel();
+    fnSelModel.addListSelectionListener(this);
+    footnoteSelectionModel2table.put(fnSelModel, model);
     JScrollPane scroll =
       new JScrollPane(view,
                       ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
@@ -1171,7 +1190,7 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
       }
     });
     window.setLayout(new BorderLayout());
-    TableEditMenu menu = new TableEditMenu(this, model, selModel);
+    TableEditMenu menu = new TableEditMenu(this, model, selModel, fnSelModel);
     tableModel2menu.put(model, menu);
     window.add(menu, BorderLayout.NORTH);
     window.add(scroll, BorderLayout.CENTER);
@@ -1200,12 +1219,35 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
     answer(msg, ":table", tableKQML);
   }
 
+  /** Apply the given table cell selection to the table view associated with
+   * it, either selecting or deselecting the cell(s) according to isSelect.
+   */
   void selectCells(TableSelection sel, boolean isSelect) {
     Table model = sel.table;
     SpanTable view = tableModel2view.get(model);
     TableSelectionModel selModel = view.getSelectionModel();
     selModel.setSelection(sel, isSelect);
     cellsSelected(sel, isSelect);
+  }
+
+  /** Select or deselect the footnote at the given index on the given table, in
+   * the table view associated with it.
+   */
+  void selectFootnote(Table model, int index, boolean isSelect) {
+    SpanTable view = tableModel2view.get(model);
+    JList fnView = view.footnotes;
+    if (isSelect) {
+      fnView.setSelectedIndex(index);
+      // will be reported in valueChanged()
+    } else if ((!fnView.isSelectionEmpty()) &&
+	       fnView.getSelectedIndex() == index) {
+      // we're deselecting the index that is in fact currently selected
+      fnView.clearSelection();
+      // won't be reported in valueChanged(), have to do it here:
+      footnoteSelected(model, index, isSelect);
+    }
+    // else we're deselecting something that's not selected. Nothing happened,
+    // so don't report a (de)selection event
   }
 
   /** Report that a region was (de)selected. */
@@ -1222,6 +1264,16 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
   void cellsSelected(TableSelection sel, boolean isSelect) {
     KQMLPerformative action = new KQMLPerformative(isSelect ? "selected" : "deselected");
     KQMLObject what = sel.toKQML();
+    action.setParameter(":what", what);
+    report(action);
+  }
+
+  /** Report that a footnote on a table was (de)selected. */
+  void footnoteSelected(Table table, int index, boolean isSelect) {
+    KQMLPerformative action = new KQMLPerformative(isSelect ? "selected" : "deselected");
+    KQMLPerformative what = new KQMLPerformative("footnote");
+    what.setParameter(":table", table.getID());
+    what.setParameter(":index", ""+index);
     action.setParameter(":what", what);
     report(action);
   }
@@ -1306,8 +1358,29 @@ public class PDFExtractor extends StandardCWCModule implements PDFPane.Listener,
   @Override public void valueChanged(TableSelection sel) {}
 
   @Override public void valueStoppedChanging(TableSelection sel) {
-    // TODO report deselect? SpanTable doesn't do deselecting yet
-    cellsSelected(sel, true);
+    // NOTE: The only way we could get an empty cell selection like this is if
+    // the selection changed to a footnote; in that case we shouldn't report a
+    // deselection, but rather wait for the footnote selection to be reported.
+    // The same applies in reverse for reporting footnote deselection.
+    if (!sel.isEmpty())
+      cellsSelected(sel, true);
+  }
+
+  //// ListSelectionListener ////
+
+  @Override public void valueChanged(ListSelectionEvent evt) {
+    if (evt.getValueIsAdjusting()) return; // don't report intermediate states
+    ListSelectionModel source = (ListSelectionModel)evt.getSource();
+    Table table = footnoteSelectionModel2table.get(source);
+    int index = source.getMinSelectionIndex();
+    boolean isSelect = !source.isSelectionEmpty();
+    /* we don't report deselect here; see valueStoppedChanging() above
+    // if this is a deselection, the current index will be -1; to get the index
+    // that was previously selected, we have to ask the event, not the source
+    if (!isSelect) index = evt.getFirstIndex();
+    footnoteSelected(table, index, isSelect);*/
+    if (isSelect)
+      footnoteSelected(table, index, true);
   }
 
   public static void main(String[] argv) {

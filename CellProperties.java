@@ -65,14 +65,21 @@ public class CellProperties implements Cloneable {
     this(null, "", Type.DATA, null);
   }
 
-  public KQMLPerformative toKQML(KQMLPerformative perf) {
+  public KQMLPerformative toKQML(KQMLPerformative perf, boolean isNote) {
     if (newText != null)
       perf.setParameter(":content", new KQMLString(newText));
     perf.setParameter(":annotations", new KQMLString(annotations));
-    perf.setParameter(":type", type.toKQML());
-    if (headingFor != null)
-      perf.setParameter(":heading-for", new KQMLString(headingFor.toString()));
+    if (!isNote) {
+      perf.setParameter(":type", type.toKQML());
+      if (headingFor != null)
+	perf.setParameter(":heading-for",
+			  new KQMLString(headingFor.toString()));
+    }
     return perf;
+  }
+
+  public KQMLPerformative toKQML(KQMLPerformative perf) {
+    return toKQML(perf, false);
   }
 
   public KQMLObject toKQML() {
@@ -269,8 +276,9 @@ public class CellProperties implements Cloneable {
     GridBagConstraints constraints;
     JTextField hfInput;
 
-    /** Make a new full Editor for a single cell. */
-    public Editor(RectangularTextContainer<TextElement> original) {
+    /** Make a new full Editor for a single cell. If isNote == true, this is a
+     * caption or footnote, so don't show cell type/heading for fields. */
+    public Editor(RectangularTextContainer<TextElement> original, boolean isNote) {
       super(new GridBagLayout());
       table = null;
       this.original = original;
@@ -287,7 +295,8 @@ public class CellProperties implements Cloneable {
       addLabeledField("Original content", orig);
 
       JTextArea newInput =
-        new JTextArea(newText == null ? original.getText() : newText, 2, 40);
+        new JTextArea(newText == null ? Cell.getTextOf(original) : newText,
+		      2, 40);
       newInput.putClientProperty("name", "newText");
       newInput.setInputVerifier(verifier);
       addLabeledField("Edited content", newInput);
@@ -297,17 +306,19 @@ public class CellProperties implements Cloneable {
       annInput.setInputVerifier(verifier);
       addLabeledField("Annotations", annInput);
 
-      JComboBox<Type> typeInput =
-        new JComboBox<Type>(EnumSet.allOf(Type.class).toArray(new Type[3]));
-      typeInput.setSelectedItem(type);
-      typeInput.setActionCommand("type");
-      typeInput.addActionListener(this);
-      addLabeledField("Cell type", typeInput);
+      if (!isNote) {
+	JComboBox<Type> typeInput =
+	  new JComboBox<Type>(EnumSet.allOf(Type.class).toArray(new Type[3]));
+	typeInput.setSelectedItem(type);
+	typeInput.setActionCommand("type");
+	typeInput.addActionListener(this);
+	addLabeledField("Cell type", typeInput);
 
-      hfInput = new JTextField(headingFor == null ? "N/A" : headingFor.toString(), 10);
-      hfInput.putClientProperty("name", "headingFor");
-      hfInput.setInputVerifier(verifier);
-      addLabeledField("Heading for cells", hfInput);
+	hfInput = new JTextField(headingFor == null ? "N/A" : headingFor.toString(), 10);
+	hfInput.putClientProperty("name", "headingFor");
+	hfInput.setInputVerifier(verifier);
+	addLabeledField("Heading for cells", hfInput);
+      }
     }
 
     /** Make a new partial editor for multiple cells. */
@@ -401,7 +412,7 @@ public class CellProperties implements Cloneable {
 	String cmd = (String)component.getClientProperty("name");
 	switch (cmd) {
 	  case "newText":
-	    newText = (text.equals(original.getText()) ? null : text);
+	    newText = (text.equals(Cell.getTextOf(original)) ? null : text);
 	    return true;
 	  case "annotations":
 	    annotations = text;
@@ -431,16 +442,11 @@ public class CellProperties implements Cloneable {
     }
   }
 
-  public Editor getEditor(RectangularTextContainer<TextElement> original) {
-    return new Editor(original);
+  public Editor getEditor(RectangularTextContainer<TextElement> original, boolean isNote) {
+    return new Editor(original, isNote);
   }
 
-  private Editor getMulticellEditor() {
+  public Editor getMulticellEditor() {
     return new Editor();
-  }
-
-  public static Editor getEditor() {
-    // FIXME? maybe use MergedCell#getProperties() instead of new, in order to merge existing properties
-    return new CellProperties().getMulticellEditor();
   }
 }

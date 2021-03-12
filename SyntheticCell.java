@@ -18,6 +18,14 @@ public class SyntheticCell extends Cell {
     this.text = text;
   }
 
+  public SyntheticCell(String text) {
+    this(0, 0, text);
+  }
+
+  public SyntheticCell() {
+    this("");
+  }
+
   @Override public String getText() { return text; }
 
   @Override

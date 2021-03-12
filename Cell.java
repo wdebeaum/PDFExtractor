@@ -57,8 +57,10 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
       text = ((HasText)cell).getText();
     } else if (cell instanceof RectangularTextContainer) {
       text = ((RectangularTextContainer)cell).getText();
+    } else if (cell == null) { // this case comes up when we edit a new caption
+      text = "";
     } else {
-      throw new IllegalArgumentException("expected a Cell, HasText, or RectangularTextContainer, but got a " + cell.getClass().getName());
+      throw new IllegalArgumentException("expected a Cell, HasText, or RectangularTextContainer, or null, but got a " + cell.getClass().getName());
     }
     // get rid of line breaks etc. within individual unmerged cells
     return text.replaceAll("\\s", " ");
@@ -90,6 +92,10 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
   public static HTMLBuilder getHTMLOf(Object o) {
     return getHTMLOf(o, new HTMLBuilder());
   }
+
+  // this definition of toString helps JList<Cell> show cell contents with
+  // superscripts etc.
+  @Override public String toString() { return getHTML().toDocumentString(); }
 
   /** Get the colspan/rowspan of this (individually?) merged cell. */
   public Dimension getSpan() {
@@ -196,19 +202,19 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
       ((Cell)o).adjustHeadingFor(first, last, horizontal, delete);
   }
 
-  public CellProperties.Editor getEditor() {
-    return getProperties().getEditor(this);
+  public CellProperties.Editor getEditor(boolean isNote) {
+    return getProperties().getEditor(this, isNote);
   }
 
-  public static CellProperties.Editor getEditorOf(RectangularTextContainer rtc) {
+  public static CellProperties.Editor getEditorOf(RectangularTextContainer rtc, boolean isNote) {
     if (rtc instanceof Cell) {
-      return ((Cell)rtc).getEditor();
+      return ((Cell)rtc).getEditor(isNote);
     } else {
       // ugh.
       @SuppressWarnings("unchecked")
       RectangularTextContainer<TextElement> rtcTE =
         (RectangularTextContainer<TextElement>)rtc;
-      return new CellProperties().getEditor(rtcTE);
+      return new CellProperties().getEditor(rtcTE, isNote);
     }
   }
   

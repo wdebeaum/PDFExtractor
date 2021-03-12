@@ -11,9 +11,12 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import javax.swing.AbstractAction;
+import javax.swing.ListSelectionModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JToolBar;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import TRIPS.KQML.KQMLList;
@@ -28,6 +31,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   PDFExtractor module;
   Table table;
   TableSelectionModel selectionModel;
+  ListSelectionModel footnoteSelectionModel;
   SaveAction saveCSV;
   SaveAction saveHTML;
   UndoRedoAction undoAction;
@@ -37,15 +41,15 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   AutoMergeCellsAction autoMergeCellsAction;
   EditCaptionAction editCaptionAction;
   List<JButton> mergeTablesButtons;
-  List<JButton> splitColumnButtons;
-  List<JButton> addCaptionButtons;
+  List<JButton> regionEditActionButtons;
 
-  public TableEditMenu(PDFExtractor module, Table table, TableSelectionModel selectionModel) {
+  public TableEditMenu(PDFExtractor module, Table table, TableSelectionModel selectionModel, ListSelectionModel footnoteSelectionModel) {
     super();
     setFloatable(false);
     this.module = module;
     this.table = table;
     this.selectionModel = selectionModel;
+    this.footnoteSelectionModel = footnoteSelectionModel;
     saveCSV = new SaveAction("text/csv");
     add(saveCSV);
     saveHTML = new SaveAction("text/html");
@@ -72,18 +76,26 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     editCaptionAction = new EditCaptionAction();
     add(editCaptionAction);
     for (Class<? extends Table.Edit> c : Table.getEditClasses()) {
-      SelectionEditAction a = new SelectionEditAction(c);
-      selectionModel.addListener(a);
-      add(a);
-      // the selection is empty, so disable the button for now
-      a.setEnabled(false);
+      Class fromSelectionClass = Table.getFromSelectionClass(c);
+      if (fromSelectionClass == TableSelection.class ||
+	  fromSelectionClass == ListSelectionEvent.class) {
+	// NOTE: edits from Region selections handled separately, since there
+	// may be more than one
+	SelectionEditAction a = new SelectionEditAction(c, fromSelectionClass);
+	if (fromSelectionClass == TableSelection.class) { // table cell(s) sel.
+	  selectionModel.addListener(a);
+	} else { // footnote list selection
+	  footnoteSelectionModel.addListSelectionListener(a);
+	}
+	add(a);
+	// the selection is empty, so disable the button for now
+	a.setEnabled(false);
+      }
     }
     mergeTablesButtons = new ArrayList<JButton>();
     updateMergeTablesActions();
-    splitColumnButtons = new ArrayList<JButton>();
-    updateSplitColumnActions();
-    addCaptionButtons = new ArrayList<JButton>();
-    //updateAddCaptionActions(); // there shouldn't be any yet
+    regionEditActionButtons = new ArrayList<JButton>();
+    //updateRegionEditActions(); // there shouldn't be any yet
     for (Table other : module.getDisplayedTables()) {
       other.addTableModelListener(this);
     }
@@ -132,13 +144,15 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     }
   }
 
-  /** Generic EditAction for Table.Edits whose argument can be a TableSelection.
+  /** Generic EditAction for Table.Edits whose argument can be a TableSelection
+   * (for table cells), or a ListSelectionEvent (for a footnote).
    */
-  public class SelectionEditAction extends EditAction implements TableSelectionListener {
+  public class SelectionEditAction extends EditAction implements TableSelectionListener, ListSelectionListener {
     Class<? extends Table.Edit> editClass;
     Method editFromSelection;
+    boolean isFromFootnoteSelection;
 
-    public SelectionEditAction(Class<? extends Table.Edit> c) {
+    public SelectionEditAction(Class<? extends Table.Edit> c, Class fromSelectionClass) {
       super(Table.getButtonLabel(c), Table.getKQMLVerb(c));
       editClass = c;
       String className = editClass.getSimpleName();
@@ -148,15 +162,15 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 	"FromSelection";
       try {
 	editFromSelection =
-	  Table.class.getMethod(fromSelectionName, TableSelection.class);
-      } catch (ReflectiveOperationException ex) {
+	  Table.class.getMethod(fromSelectionName, fromSelectionClass);
+      } catch (NoSuchMethodException ex) {
 	throw new RuntimeException("improperly defined Edit subclass " + c, ex);
       }
+      isFromFootnoteSelection =
+        (fromSelectionClass == ListSelectionEvent.class);
     }
 
-    //// TableSelectionListener ////
-
-    @Override public void valueChanged(TableSelection sel) {
+    public void updateEdit(Object sel) {
       try {
 	edit = (Table.Edit)editFromSelection.invoke(table, sel);
       } catch (InvocationTargetException ex) { // wraps BadEdit
@@ -168,7 +182,35 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
 	setEnabled(edit != null);
       }
     }
+
+    //// ActionListener ////
+
+    @Override public void actionPerformed(ActionEvent evt) {
+      super.actionPerformed(evt);
+      // clear selection when a footnote is edited, for consistency with edits
+      // on table cells, which do the same thing elsewhere
+      // This also has the side effect that this action/button goes away, so
+      // that if the user wants to edit the same footnote again, a new edit
+      // will be created, with props==null again, so the dialog will be shown
+      // again when the new button is clicked
+      if (isFromFootnoteSelection)
+	footnoteSelectionModel.clearSelection();
+    }
+
+    //// TableSelectionListener ////
+
+    @Override public void valueChanged(TableSelection sel) {
+      if (!isFromFootnoteSelection)
+	updateEdit(sel);
+    }
     @Override public void valueStoppedChanging(TableSelection sel) {}
+
+    //// ListSelectionListener ////
+
+    @Override public void valueChanged(ListSelectionEvent sel) {
+      if (isFromFootnoteSelection)
+	updateEdit(sel);
+    }
   }
 
   //// EditActions with other arguments ////
@@ -239,51 +281,15 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     }
   }
 
-  public class SplitColumnAction extends EditAction {
-    public SplitColumnAction(float newColBoundX) throws Table.BadEdit {
-      super("Split column at X=" + newColBoundX, "split-column");
-      double minX = table.origin.getMinX();
-      double maxX = table.origin.getMaxX();
-      if (newColBoundX <= minX || newColBoundX >= maxX) {
-	throw new Table.BadEdit("new column boundary is outside the table");
-      }
-      for (Float cbx : table.colBoundXs) {
-	if (newColBoundX == (float)cbx)
-	  throw new Table.BadEdit("column boundary not new");
-      }
-      for (Table.Edit e : table.history) {
-	if (e instanceof Table.MergeTables) {
-	  throw new Table.BadEdit("split-column conflicts with merge-tables already in edit history");
-	}
-      }
-      edit = table.new SplitColumn(newColBoundX);
-    }
-  }
-
-  void updateSplitColumnActions() {
-    for (JButton b : splitColumnButtons) { remove(b); }
-    splitColumnButtons.clear();
-    if (table.origin == null)
-      return;
-    List<Region> regions = table.origin.getPage().getRegions();
-    synchronized (regions) {
-      for (Region r : regions) {
-	if (r.source != Region.Source.USER) continue;
-	try {
-	  float newColBoundX = (float)r.getMinX();
-	  SplitColumnAction a = new SplitColumnAction(newColBoundX);
-	  // TODO listen for changes to the region?
-	  splitColumnButtons.add(add(a));
-	} catch (Table.BadEdit ex) {
-	  // ignore this X coordinate
-	}
-      }
-    }
-  }
-  
-  public class AddCaptionAction extends EditAction {
-    public AddCaptionAction(Table.AddCaption edit) {
-      super(edit.getButtonLabel(), Table.AddCaption.kqmlVerb);
+  /** Generic EditAction for Table.Edits that can be made from a Region
+   * selection. This is separate from SelectionEditAction because while there
+   * can be only one table cell/footnote selection, there can be more than one
+   * region selected, so we need more than one button in general for each type
+   * of RegionEditAction.
+   */
+  public class RegionEditAction extends EditAction {
+    public RegionEditAction(Table.Edit edit) {
+      super(edit.getButtonLabel(), table.getKQMLVerb(edit.getClass()));
       this.edit = edit;
     }
     // disable after performing the action once (doesn't make sense to do it
@@ -294,35 +300,40 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     }
   }
 
-  void updateAddCaptionActions() {
-    for (JButton b : addCaptionButtons) { remove(b); }
-    addCaptionButtons.clear();
+  void updateRegionEditActions() {
+    for (JButton b : regionEditActionButtons) { remove(b); }
+    regionEditActionButtons.clear();
     if (table.origin == null)
       return;
-    // any region the user selected after the table origin region is a
-    // potential caption; make a button for it
+    // any region the user selected after the table origin region could be used
+    // to make an edit; make buttons for those edits
     List<Region> regions = table.origin.getPage().getRegions();
     boolean afterTableOrigin = false;
+    ArrayList<RegionEditAction> actions = new ArrayList<RegionEditAction>();
     synchronized (regions) {
-      for (Region r : regions) {
+      nextRegion: for (Region r : regions) {
+	actions.clear();
 	if (r == table.origin) {
 	  afterTableOrigin = true;
 	} else if (afterTableOrigin && r.source == Region.Source.USER) {
-	  // check that we didn't just add this caption
-	  boolean found = false;
-	  for (Table.Edit h : table.history) {
-	    if (h instanceof Table.AddCaption) {
-	      if (((Table.AddCaption)h).origin == r)
-		found = true;
-	      break;
-	    } else if (h instanceof Table.EditCaption) {
-	      break;
+	  for (Method fromSelection : Table.getEditFromRegionMethods()) {
+	    try {
+	      Table.Edit edit = (Table.Edit)fromSelection.invoke(table, r);
+	      RegionEditAction action = new RegionEditAction(edit);
+	      actions.add(action);
+	    } catch (InvocationTargetException ex) { // wraps BadEdit
+	      // ignore this region/edit combo
+	      if (ex.getCause() instanceof Table.RegionAlreadyUsed)
+		// ignore all edits for this region
+		continue nextRegion;
+	    } catch (ReflectiveOperationException ex) {
+	      throw new RuntimeException("improperly defined <edit>FromSelection method " + fromSelection, ex);
 	    }
 	  }
-	  if (found) continue; // this is already the caption
-	  Table.AddCaption edit = table.new AddCaption(r);
-	  AddCaptionAction action = new AddCaptionAction(edit);
-	  addCaptionButtons.add(add(action));
+	}
+	for (RegionEditAction action : actions) {
+	  JButton button = add(action);
+	  regionEditActionButtons.add(button);
 	}
       }
     }
@@ -338,7 +349,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
     // Doing it here just means that undoMergeCellsAction sees the old
     // selection on the new table, which can cause indexing errors.
     //undoMergeCellsAction.valueChanged(new TableSelection(selectionModel));//ick.
-    updateSplitColumnActions();
+    updateRegionEditActions();
     updateMergeTablesActions();
     revalidate();
     repaint();
@@ -347,8 +358,7 @@ public class TableEditMenu extends JToolBar implements TableModelListener, Page.
   // Page.Listener
   @Override public void pageChanged(Page.Event evt) {
     if (evt.getType() == Page.Event.Type.REGION_STOPPED_CHANGING) {
-      updateSplitColumnActions();
-      updateAddCaptionActions();
+      updateRegionEditActions();
       revalidate();
       repaint();
     }
