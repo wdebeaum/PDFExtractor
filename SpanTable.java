@@ -261,8 +261,17 @@ public class SpanTable extends JPanel implements TableModelListener, TableSelect
 
   @Override public void mouseEntered(MouseEvent evt) {
     GridBagConstraints c = layout.getConstraints(evt.getComponent());
-    selectionModel.setLead(c.gridy > 1 ? c.gridy - 2 : 0,
-			   c.gridx > 0 ? c.gridx - 1 : 0);
+    int row = c.gridy - 2, col = c.gridx - 1;
+    boolean resetCol = (row < -1); // pointer is in caption
+    if (row >= model.getRowCount()) { // pointer is in footnotes
+      row = model.getRowCount() - 1; // clamp row to table proper
+      resetCol = true;
+    }
+    if (row < 0) row = 0;
+    if (col < 0) col = 0;
+    if (resetCol) // don't set col of lead when row was outside table proper
+      col = selectionModel.colModel.getLeadSelectionIndex();
+    selectionModel.setLead(row, col);
   }
 
   @Override public void mouseExited(MouseEvent evt) {}
