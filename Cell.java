@@ -75,15 +75,28 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
       // detect superscripts and turn them into <sup>
       TextChunk chunk = (TextChunk)o;
       TextElement prev = null;
+      StringBuilder supText = null;
       for (TextElement element : chunk.getTextElements()) {
 	String text = getTextOf(element);
-	if (prev != null && isSuperscript(prev, element)) {
-	  out.sup(text);
+	if (supText != null) { // in superscript, prev is last before sup
+	  if (isSuperscript(prev, element)) {
+	    supText.append(text); // continue superscript
+	  } else { // end superscript
+	    out.sup(supText.toString());
+	    supText = null;
+	    out.text(text);
+	    prev = element;
+	  }
+	} else if (prev != null && isSuperscript(prev, element)) {
+	  // start superscript
+	  supText = new StringBuilder(text);
 	} else {
 	  out.text(text);
+	  prev = element;
 	}
-	prev = element;
       }
+      if (supText != null) // superscript at end of chunk
+	out.sup(supText.toString());
     } else {
       out.text(getTextOf(o)); // TODO? use textLines() instead of text()
     }
@@ -136,7 +149,10 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
   }
 
   /** Is right plausibly a superscript of left (given they are horizontally
-   * adjacent)? Does right use a smaller font, and have a higher bottom edge?
+   * adjacent)? Does right seem to use a smaller font, and have a significantly
+   * higher bottom edge? (Or is right some kind of dash indicating a negation
+   * sign, use a different-size font (space not necessarily narrower), and have
+   * a significantly higher bottom edge?)
    */
   public static boolean isSuperscript(TextElement left, TextElement right) {
     // NOTE: getFontSize() doesn't take into account some transformation
@@ -146,7 +162,11 @@ public abstract class Cell extends RectangularTextContainer<TextElement> impleme
     float rightSize = right.getWidthOfSpace(); //getFontSize();
     float leftBottom = left.getBottom();
     float rightBottom = right.getBottom();
-    return (leftSize > rightSize && leftBottom > rightBottom);
+    // see also $dash_re in ../TextTagger/Perl/TextTagger/Normalize.pm
+    boolean isDash = right.getText().matches("[\\x{2010}-\\x{2015}\\x{2212}-]");
+    return ((isDash ? (leftSize != rightSize) : (leftSize > rightSize)) &&
+            // right's bottom edge at least width-of-space higher than left's?
+	    (leftBottom > rightBottom + leftSize));
   }
 
   /** Does the cell have no area? */
