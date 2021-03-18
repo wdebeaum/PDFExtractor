@@ -1,6 +1,6 @@
 # PDFExtractor #
 
-PDFExtractor displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, and displays the extracted data tables. It uses [Tabula](https://tabula.technology/) for table extraction, and [Apache PDFBox](https://pdfbox.apache.org/) for reading and drawing PDF files.
+PDFExtractor displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, displays the extracted data tables, lets the user edit those tables to improve the quality of the extractions, and saves the tables as CSV or HTML. It uses [Tabula](https://tabula.technology/) (technically its backend, [tabula-java](https://github.com/tabulapdf/tabula-java)) for table extraction, and [Apache PDFBox](https://pdfbox.apache.org/) for reading and drawing PDF files.
 
 This file is the README for the standalone version of PDFExtractor. The main documentation in [README.html](README.html) is written in the context of TRIPS. For the standalone version, `$TRIPS_BASE` is `trips-base/`.
 
