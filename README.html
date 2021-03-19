@@ -57,7 +57,7 @@ img {
 <body>
 <h1>PDFExtractor</h1>
 William de Beaumont<br>
-$Date: 2021/03/18 20:21:37 $
+$Date: 2021/03/19 16:26:32 $
 
 <h2>Introduction</h2>
 <p>PDFExtractor is a TRIPS module that displays pages of PDF files, allows the user to select rectangular regions within those pages, extracts and searches text and tabular data within those regions, displays the extracted data tables, lets the user edit those tables to improve the quality of the extractions, and saves the tables as CSV or HTML. It uses <a href="https://tabula.technology/">Tabula</a> (technically its backend, <a href="https://github.com/tabulapdf/tabula-java">tabula-java</a>) for table extraction, and <a href="https://pdfbox.apache.org/">Apache PDFBox</a> for reading and drawing PDF files.</p>
@@ -115,9 +115,13 @@ $Date: 2021/03/18 20:21:37 $
 
 <p>Dragging the left mouse button will select a rectangular region of the currently displayed page. Dragging the left mouse button starting near the edge or corner of an existing highlighted region will instead move that edge or corner. If you change an existing region so that its opposite edges are the same, it will deselect the region. If you do this when first selecting a region, the selection will be cancelled.</p>
 
-<p>Instead of manually selecting table regions, you can also ask Tabula to do it for you by clicking the <code>Detect Table</code> button.</p>
+<p>The last region you interact with on a page will have a solid border, while any others will have a dashed border. If you click inside exactly one region (i.e. not somewhere where two or more overlap), that will also pick it as the one with the solid border. If there is nowhere inside the region you want to pick that doesn't overlap another region, you can still pick it by clicking on its edge or corner, as if you were about to drag it.</p>
 
-<p>Clicking the <code>Parse Table</code> button in the document window will parse the region last selected on the current page as a table, and then display the table in a new window.</p>
+<p>Instead of manually selecting table regions, you can also ask Tabula to do it for you by clicking the <code>Detect Table</code> button. Sometimes this will select more than one region; you can click on the one you want to pick for the next step.</p>
+
+<p>Clicking the <code>Parse Table</code> button in the document window will parse the region with the solid border as a table, and then display the table in a new window.</p>
+
+<p>In general, you should avoid adjusting regions you have already used in order to use them for another purpose, and instead select a new region. If you adjust an old region, it can affect what it was originally used for. For example, suppose there are two tables on a page, and you selected a region around one of them and parsed a table from that region. That table remembers which region it came from, and uses it for the undo function, among other things. To parse the other table, do not drag the edges of the old region to make them surround the new table. Instead, make a new region around the new table.</p>
 
 <h3>Table windows</h3>
 

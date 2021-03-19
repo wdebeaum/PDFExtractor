@@ -128,6 +128,17 @@ public class Page implements HasID, TextMatch.Searchable {
     emit(new Event(Event.Type.REGION_REMOVED, region));
   }
 
+  /** Move the region to the end of the regions list, effectively raising it to
+   * the top of the stack of regions on the page, and selecting it as the
+   * region to use for parsing a table from.
+   */
+  public void raiseRegion(Region region) {
+    synchronized (regions) {
+      regions.remove(region); // from whereever it is
+      regions.add(region); // to the end of the list
+    }
+  }
+
   /** Return an equivalent Tabula Page object. Note that Tabula "Page"s can be
    * either the whole page or an area of the page. This gets the former.
    */

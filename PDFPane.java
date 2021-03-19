@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
+import java.awt.BasicStroke;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -130,8 +131,23 @@ public class PDFPane extends JComponent implements KeyListener, MouseInputListen
       renderer.renderPageToGraphics(pageIndex, g2d);
       List<Region> regions = getPage().getRegions();
       synchronized (regions) {
-	for (Region region : regions)
+	if (regions.isEmpty())
+	  return;
+	Region last = regions.get(regions.size()-1);
+	// for non-last regions, set a dashed stroke
+	((Graphics2D)g).setStroke(
+	  new BasicStroke(
+	    // defaults for other stroke properties
+	    1.0f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10.0f,
+	    // dashed stroke properties
+	    new float[]{5.0f, 5.0f}, 0.0f
+	  )
+	);
+	for (Region region : regions) {
+	  if (region == last) // for last region, reset to default solid stroke
+	    ((Graphics2D)g).setStroke(new BasicStroke());
 	  region.paint(g);
+	}
       }
     } catch (IOException e) {
       System.err.println(e);
@@ -186,6 +202,7 @@ public class PDFPane extends JComponent implements KeyListener, MouseInputListen
 	currentHandle = EnumSet.of(Region.Coord.X2, Region.Coord.Y2);
       } else { // resize an existing region
 	currentHandle = currentRegion.getHandleAt(x, y);
+	currentRegion.raise();
       }
     }
   }
@@ -197,8 +214,21 @@ public class PDFPane extends JComponent implements KeyListener, MouseInputListen
 	currentRegion.setNew(false);
       } else { // degenerate selection, forget it
 	currentRegion.remove();
-	if (!isDragging) // we weren't dragging, report a click
-	  emitPageClicked(evt.getX(), evt.getY());
+	if (!isDragging) { // we weren't dragging, report a click
+	  int x = evt.getX(), y = evt.getY();
+	  // but first, if we clicked on exactly one region, raise it to the
+	  // top
+	  Page page = getPage();
+	  List<Region> allRegions = page.getRegions();
+	  synchronized (allRegions) {
+	    List<Region> clickedRegions = page.getRegionsAt(x, y);
+	    if (clickedRegions.size() == 1) {
+	      Region clickedRegion = clickedRegions.get(0);
+	      clickedRegion.raise();
+	    }
+	  }
+	  emitPageClicked(x, y);
+	}
       }
       currentRegion = null;
     }

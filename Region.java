@@ -252,6 +252,10 @@ public class Region implements HasID, HasHTML, TextMatch.Searchable, HasSortOrde
     HasID.remove(this);
   }
 
+  public void raise() {
+    page.raiseRegion(this);
+  }
+
   /** Generate a color for a Region.
    * The color should be visible and distinct from other colors so generated.
    * Currently, hues are in the interval [0, 1], saturations [0.5, 1], and 
