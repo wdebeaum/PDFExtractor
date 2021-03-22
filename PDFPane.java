@@ -211,7 +211,13 @@ public class PDFPane extends JComponent implements KeyListener, MouseInputListen
     if (evt.getButton() == MouseEvent.BUTTON1 && currentRegion != null) {
       if (currentRegion.getAbsWidth() > 1 && currentRegion.getAbsHeight() > 1) {
 	currentRegion.normalize(); // for my own sanity
-	currentRegion.setNew(false);
+	if (!isDragging) { // we weren't dragging, just raise and report click
+	  currentRegion.raise();
+	  emitPageClicked(evt.getX(), evt.getY());
+	  evt.getComponent().repaint(); // make raising visible
+	} else { // we dragged, so region might be new or changed
+	  currentRegion.setNew(false);
+	}
       } else { // degenerate selection, forget it
 	currentRegion.remove();
 	if (!isDragging) { // we weren't dragging, report a click
@@ -338,7 +344,6 @@ public class PDFPane extends JComponent implements KeyListener, MouseInputListen
 
   public void emitPageClicked(int x, int y) {
     Page page = getPage();
-    JFrame window = (JFrame)getTopLevelAncestor();
     for (Listener l : listeners) {
       l.pageClicked(x, y, page);
     }
